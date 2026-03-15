@@ -259,6 +259,18 @@ class SmartEVCCOptionsFlowHandler(config_entries.OptionsFlow):
         current_config = dict(self.config_entry.data)
         current_config.update(self.config_entry.options)
 
+        # Try to fetch current live values for placeholders
+        fuse_state = self.hass.states.get(f"number.{DOMAIN}_main_fuse")
+        fuse_val = fuse_state.state if fuse_state else self.config_entry.data.get(CONF_MAIN_FUSE, "-")
+        
+        price_state = self.hass.states.get(f"number.{DOMAIN}_max_price_limit")
+        price_val = price_state.state if price_state else "-"
+
         return self.async_show_form(
-            step_id="init", data_schema=_get_options_schema(current_config)
+            step_id="init", 
+            data_schema=_get_options_schema(current_config),
+            description_placeholders={
+                "current_fuse": str(fuse_val),
+                "current_price": str(price_val),
+            }
         )

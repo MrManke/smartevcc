@@ -449,7 +449,12 @@ class SmartEVCCEMS:
                         forecasts = response.get(temp_id, {}).get("forecast", [])
                         if forecasts:
                             # Look at the next 24 hours (or less if fewer are available)
-                            temps = [f.get("temperature") for f in forecasts[:24] if f.get("temperature") is not None]
+                            temps = []
+                            for f in forecasts[:24]:
+                                if f.get("temperature") is not None:
+                                    temps.append(f.get("temperature"))
+                                elif f.get("templow") is not None:
+                                    temps.append(f.get("templow"))
                             if temps:
                                 min_expected_temp = min(temps)
                                 _LOGGER.debug("Weather forecast next 24h min temp: %.1f", min_expected_temp)
@@ -568,6 +573,9 @@ class SmartEVCCEMS:
         self._slow_loop_last_run = f"Needed {hours_needed}h. Charge now: {charge_now}."
         _LOGGER.info(self._slow_loop_last_run)
 
+        # Signal UI that sensors (like planned charging & lowest temp) have been updated
+        async_dispatcher_send(self.hass, f"{DOMAIN}_update_{self.config_entry.entry_id}")
+
     async def _fast_loop_tick(self, now: datetime) -> None:
         """Execute the fast loop logic (Fuse Protection)."""
         data = self.config_entry.data
@@ -634,7 +642,7 @@ class SmartEVCCEMS:
         if not self._price_allows_charging:
             _LOGGER.debug("Price Optimizer: Charging blocked. Pausing Zaptec/forcing to min.")
             decision = "Price Planner: Paused"
-            self._set_state("Price_Wait")
+            self._set_state("Väntar")
             
             zaptec_entity = self.zaptec_charger
             if zaptec_entity:
@@ -668,7 +676,7 @@ class SmartEVCCEMS:
             elif now_ts - p1_start >= 30:
                 _LOGGER.error("P1 meter data missing for >30s! Forcing Zaptec to minimum.")
                 decision = "P1 Data Missing (Fallback to 6A)"
-                self._set_state("Fuse_Protect_Paused")
+                self._set_state("Väntar")
                 
                 zaptec_amps = self._get_zaptec_amps()
                 if zaptec_amps is None or zaptec_amps > ZAPTEC_MIN_AMPS:

@@ -44,7 +44,7 @@
     "step": {
       "init": {
         "title": "Ändra inställningar för SmartEVCC",
-        "description": "Ändra gränsvärden och reläer för din smarta elbilsladdning.",
+        "description": "Ändra gränsvärden och reläer för din smarta elbilsladdning.\n\n*(Nuvarande: Säkring {current_fuse}A, Maxpris {current_price} kr)*",
         "data": {
           "main_fuse": "Huvudsäkring (Ampere)",
           "p1_phase_1": "P1 Mätare - Fas 1 ström",
