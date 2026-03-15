@@ -136,6 +136,7 @@ class SmartEVCCNumber(RestoreEntity, NumberEntity):
             manufacturer="SmartEVCC",
             model="Local EMS",
         )
+        self._attr_mode = "slider"
         self._attr_native_value = 0.0
 
     async def async_added_to_hass(self) -> None:

@@ -36,6 +36,9 @@ När komponenten ligger i drift är alla dina viktiga parameterar samlade som fy
 * **EV Battery Capacity & Max Charge Rate:** De fysiska parametrarna systemet använder för schemaläggning.
 * **Cold Temp Threshold & Cold Charge Rate:** Automatisk throttlings-logik på vinterhalvåret. 
 
+### Sensorer
+* **[Ny] Lägsta prognostiserade temperatur:** Visar kalkylen från vädersensorn du angett, som systemet baserar "Cold Temp"-throttling på.
+
 ### Brytare (Switch)
 * **Force Charge (Override):** Tvingar laddning att starta omedelbart (men du är fortfarande skyddad av Fast Loop och P1-mätaren).
 * **Load Shedding:** Slå av/på funktionen för att tillfälligt stänga av husets element och varmvatten vid lasttoppar.
@@ -58,6 +61,7 @@ Inga yaml-filer behövs - komponenten stöder fullständig Home Assistant Config
 | **Huvudsäkring** | Siffra på hur mycket ditt tak är per fas. Fritext: T.ex. 16, 20 eller 17.5A. | *`16`* |
 | **P1 Fas 1-3** | Sensorer som visar strömförbrukningen i realtid. | *`sensor.p1_fas_1_current`* |
 | **Zaptec Ladd-Amp** | The number-entity som ställer amp på boxen. | *`number.zaptec_id_max_laddstrom`* |
+| **[Ny] Charger Status** | Valfri sensor som visar om bilen är inkopplad för att stoppa onödiga anrop. | *`sensor.zaptec_id_laddstatus`* |
 | **Nordpool Entity** | Nuvarande timpris-entitet från t.ex. HACS-Nordpool. | *`sensor.nordpool_kwh_se3`* |
 | **EV Battery Level** | Sensor som visar bilens nuvarande SoC (State of Charge). | *`sensor.id4_battery_level`* |
 | **EV Min SoC** | Nödladdning! %-gräns där bilen alltid laddar oavsett om elen är dyr. | *`20`* |

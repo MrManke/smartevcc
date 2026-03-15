@@ -35,6 +35,7 @@ from .const import (
     CONF_EV_COLD_CHARGE_RATE,
     CONF_DEPARTURE_TIME,
     CONF_RECOVERY_DURATION,
+    CONF_CHARGER_STATUS_ENTITY,
     DEFAULT_DEBUG_MODE,
     DEFAULT_ENABLE_LOAD_SHEDDING,
     DEFAULT_MAIN_FUSE,
@@ -84,9 +85,10 @@ class SmartEVCCEMS:
         # Slow Loop State
         self._price_allows_charging: bool = False
         self._slow_loop_last_run: str = ""
+        self.lowest_expected_temp: float | None = None
 
         # Sensor State Machine
-        self.current_state: str = "Idle"
+        self.current_state: str = "Väntar"
 
         # Toggled Options from UI Entities (Switch / Number)
         self.force_charge: bool = False
@@ -104,6 +106,7 @@ class SmartEVCCEMS:
         self.ev_cold_charge_rate: float = float(config_entry.options.get(CONF_EV_COLD_CHARGE_RATE, config_entry.data.get(CONF_EV_COLD_CHARGE_RATE, DEFAULT_EV_COLD_CHARGE_RATE)))
         self.recovery_duration: float = float(config_entry.options.get(CONF_RECOVERY_DURATION, config_entry.data.get(CONF_RECOVERY_DURATION, DEFAULT_RECOVERY_DURATION)))
         self.debug_mode: bool = bool(config_entry.options.get(CONF_DEBUG_MODE, config_entry.data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE)))
+        self.charger_status_entity: str | None = config_entry.options.get(CONF_CHARGER_STATUS_ENTITY) or config_entry.data.get(CONF_CHARGER_STATUS_ENTITY)
 
     def _set_state(self, new_state: str) -> None:
         """Update the component state and notify listeners."""
@@ -451,6 +454,8 @@ class SmartEVCCEMS:
             # Fallback for standard sensors or if forecast fails
             if min_expected_temp is None:
                 min_expected_temp = self._get_float_state(temp_id)
+                
+            self.lowest_expected_temp = min_expected_temp
 
             if min_expected_temp is not None and min_expected_temp < cold_threshold:
                 _LOGGER.info("Cold weather expected (%.1f°C < %.1f°C). Throttling assumed charge rate to %.1fkW", min_expected_temp, cold_threshold, cold_rate)
@@ -553,8 +558,39 @@ class SmartEVCCEMS:
         
         now_ts = time.time()
 
-        # Determine what state we ALREADY are in right now visually
         decision = "OK"
+
+        # PHASE 1: EV Status Check (Short-circuit if not connected)
+        if self.charger_status_entity:
+            status_state = self.hass.states.get(self.charger_status_entity)
+            if status_state and status_state.state.lower() == "disconnected":
+                decision = "Disconnected - Charger OFF"
+                self._set_state("Ej ansluten")
+                
+                # Turn off the charger completely instead of forcing 6A
+                zaptec_entity = self.zaptec_charger
+                if zaptec_entity:
+                    zaptec_switch = zaptec_entity.replace("number.", "switch.").replace("_max_laddstrom", "_laddar")
+                    if "zaptec" not in zaptec_switch:
+                        zaptec_switch = "switch.zaptec_go_laddar"
+                        
+                    switch_state = self.hass.states.get(zaptec_switch)
+                    if switch_state and switch_state.state != "off":
+                        _LOGGER.info("EV Disconnected: Shutting down charger completely via %s", zaptec_switch)
+                        await self.hass.services.async_call(
+                            "switch", "turn_off", {"entity_id": zaptec_switch}, blocking=False
+                        )
+                
+                # Reset timers so recovery doesn't trigger unexpectedly later
+                self._safe_start_time = None
+                self._overload_start_time = None
+                self._severe_overload_start_time = None
+                
+                if self.debug_mode:
+                    await self.hass.async_add_executor_job(
+                        self._dump_debug_data, loads, safe_limit, decision
+                    )
+                return
 
         # PHASE 4 INTEGRATION: If price/schedule planner blocks charging, override.
         if not self._price_allows_charging:
@@ -685,15 +721,15 @@ class SmartEVCCEMS:
         if self._price_allows_charging:
             # We are currently allowed to charge, update State Machine based on Fast Loop activity
             if self._shedded_devices:
-                self._set_state("Shedding")
+                self._set_state("Lastbalanserar")
             else:
                 zaptec_amps = self._get_zaptec_amps()
                 if max_current is not None and max_current > safe_limit:
-                    self._set_state("Fuse_Protect_Paused")
+                    self._set_state("Överbelastning")
                 elif zaptec_amps is not None and zaptec_amps > ZAPTEC_MIN_AMPS:
-                    self._set_state("Charging")
+                    self._set_state("Laddar")
                 else:
-                    self._set_state("Idle")
+                    self._set_state("Väntar")
 
         if self.debug_mode:
             _LOGGER.debug("SmartEVCC Fast Loop - Phase Loads: %s | Limit: %sA | Decision: %s", loads, safe_limit, decision)

@@ -10,6 +10,7 @@
           "p1_phase_2": "P1 Mätare - Fas 2 ström",
           "p1_phase_3": "P1 Mätare - Fas 3 ström",
           "charger_control_entity": "Zaptec Maxström (Number Entity)",
+          "charger_status_entity": "Sensor för laddstatus",
           "nordpool_entity": "Nordpool Pris-sensor (kWh)",
           "ev_battery_level": "Bilens Batterinivå (Sensor %)",
           "ev_min_soc": "Nödladdning: Min SoC (%)",
@@ -20,7 +21,8 @@
           "ev_cold_temp_threshold": "Köldgräns för lägre laddeffekt (°C)",
           "ev_cold_charge_rate": "Assumerad Laddeffekt vid extremkyla (kW)",
           "departure_time": "Avfärdstid (HH:MM)",
-          "enable_load_shedding": "Aktivera Load Shedding (Relästyrning)",
+          "recovery_duration": "Väntetid för upprampning",
+          "enable_load_shedding": "Aktivera lastbalansering (Hus)",
           "shedding_level_1_switches": "Nivå 1 Switchar (VVB etc)",
           "shedding_level_2_switches": "Nivå 2 Switchar (Element etc)",
           "shedding_climates": "Nivå 3: Klimatanläggningar (Sänks med 3 grader)",
@@ -48,6 +50,7 @@
           "p1_phase_2": "P1 Mätare - Fas 2 ström",
           "p1_phase_3": "P1 Mätare - Fas 3 ström",
           "charger_control_entity": "Zaptec Maxström (Number Entity)",
+          "charger_status_entity": "Sensor för laddstatus",
           "nordpool_entity": "Nordpool Pris-sensor (kWh)",
           "ev_battery_level": "Bilens Batterinivå (Sensor %)",
           "ev_min_soc": "Nödladdning: Min SoC (%)",
@@ -58,12 +61,20 @@
           "ev_cold_temp_threshold": "Köldgräns för lägre laddeffekt (°C)",
           "ev_cold_charge_rate": "Assumerad Laddeffekt vid extremkyla (kW)",
           "departure_time": "Avfärdstid (HH:MM)",
-          "enable_load_shedding": "Aktivera Load Shedding",
+          "recovery_duration": "Väntetid för upprampning",
+          "enable_load_shedding": "Aktivera lastbalansering (Hus)",
           "shedding_level_1_switches": "Nivå 1 Switchar (VVB etc)",
           "shedding_level_2_switches": "Nivå 2 Switchar (Element etc)",
           "shedding_climates": "Nivå 3: Klimatanläggningar (Sänks)",
           "debug_mode": "Aktivera utökad felsökning"
         }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "lowest_temp_forecast": {
+        "name": "Lägsta prognostiserade temperatur"
       }
     }
   }

@@ -7,6 +7,7 @@ CONF_P1_PHASE_1 = "p1_phase_1"
 CONF_P1_PHASE_2 = "p1_phase_2"
 CONF_P1_PHASE_3 = "p1_phase_3"
 CONF_CHARGER_CONTROL_ENTITY = "charger_control_entity"
+CONF_CHARGER_STATUS_ENTITY = "charger_status_entity"
 
 # Slow Loop Configs
 CONF_NORDPOOL_ENTITY = "nordpool_entity"
