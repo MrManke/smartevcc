@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -164,14 +164,14 @@ class SmartEVCCEMS:
         self._remove_fast_loop = async_track_time_interval(
             self.hass,
             self._fast_loop_tick,
-            asyncio.timedelta(seconds=FAST_LOOP_INTERVAL),
+            timedelta(seconds=FAST_LOOP_INTERVAL),
         )
         
         _LOGGER.debug("Starting SmartEVCC EMS slow loop")
         self._remove_slow_loop = async_track_time_interval(
             self.hass,
             self._slow_loop_tick,
-            asyncio.timedelta(seconds=SLOW_LOOP_INTERVAL),
+            timedelta(seconds=SLOW_LOOP_INTERVAL),
         )
         # Run slow loop once immediately on startup
         self.hass.async_create_task(self._slow_loop_tick(datetime.now()))
