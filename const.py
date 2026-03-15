@@ -11,6 +11,7 @@ CONF_CHARGER_CONTROL_ENTITY = "charger_control_entity"
 # Slow Loop Configs
 CONF_NORDPOOL_ENTITY = "nordpool_entity"
 CONF_EV_BATTERY_LEVEL = "ev_battery_level"
+CONF_EV_MIN_SOC = "ev_min_soc"
 CONF_EV_TARGET_LEVEL = "ev_target_level"
 CONF_EV_BATTERY_CAPACITY = "ev_battery_capacity"
 CONF_EV_MAX_CHARGE_RATE = "ev_max_charge_rate"
@@ -30,6 +31,7 @@ DEFAULT_DEBUG_MODE = False
 DEFAULT_ENABLE_LOAD_SHEDDING = False
 
 # Slow Loop Defaults
+DEFAULT_EV_MIN_SOC = 20
 DEFAULT_EV_TARGET_LEVEL = 80
 DEFAULT_EV_BATTERY_CAPACITY = 77.0
 DEFAULT_EV_MAX_CHARGE_RATE = 11.0

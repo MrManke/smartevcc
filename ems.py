@@ -29,6 +29,7 @@ from .const import (
     CONF_EV_TARGET_LEVEL,
     CONF_EV_BATTERY_CAPACITY,
     CONF_EV_MAX_CHARGE_RATE,
+    CONF_EV_MIN_SOC,
     CONF_EV_TEMP_SENSOR,
     CONF_EV_COLD_TEMP_THRESHOLD,
     CONF_EV_COLD_CHARGE_RATE,
@@ -39,6 +40,7 @@ from .const import (
     DEFAULT_EV_TARGET_LEVEL,
     DEFAULT_EV_BATTERY_CAPACITY,
     DEFAULT_EV_MAX_CHARGE_RATE,
+    DEFAULT_EV_MIN_SOC,
     DEFAULT_EV_COLD_TEMP_THRESHOLD,
     DEFAULT_EV_COLD_CHARGE_RATE,
     DEFAULT_DEPARTURE_TIME,
@@ -387,6 +389,7 @@ class SmartEVCCEMS:
         soc_id = cfg.options.get(CONF_EV_BATTERY_LEVEL) or cfg.data.get(CONF_EV_BATTERY_LEVEL)
         temp_id = cfg.options.get(CONF_EV_TEMP_SENSOR) or cfg.data.get(CONF_EV_TEMP_SENSOR)
         
+        min_soc = float(cfg.options.get(CONF_EV_MIN_SOC, cfg.data.get(CONF_EV_MIN_SOC, DEFAULT_EV_MIN_SOC)))
         target_soc = float(cfg.options.get(CONF_EV_TARGET_LEVEL, cfg.data.get(CONF_EV_TARGET_LEVEL, DEFAULT_EV_TARGET_LEVEL)))
         capacity = float(cfg.options.get(CONF_EV_BATTERY_CAPACITY, cfg.data.get(CONF_EV_BATTERY_CAPACITY, DEFAULT_EV_BATTERY_CAPACITY)))
         max_rate = float(cfg.options.get(CONF_EV_MAX_CHARGE_RATE, cfg.data.get(CONF_EV_MAX_CHARGE_RATE, DEFAULT_EV_MAX_CHARGE_RATE)))
@@ -405,14 +408,21 @@ class SmartEVCCEMS:
             self._price_allows_charging = True
             return
 
-        # 1. Calculate Energy Needed
+        # 1. Check Minimum SoC (Emergency Charging)
+        if current_soc < min_soc:
+            self._price_allows_charging = True
+            self._slow_loop_last_run = f"Emergency Charging: Current SoC ({current_soc:.1f}%) < Min SoC ({min_soc:.1f}%)"
+            _LOGGER.info(self._slow_loop_last_run)
+            return
+
+        # 2. Calculate Energy Needed
         energy_needed_kwh = (target_soc - current_soc) / 100.0 * capacity
         if energy_needed_kwh <= 0:
             _LOGGER.info("EV Target SOC reached (%.1f%% >= %.1f%%). Pausing charging.", current_soc, target_soc)
             self._price_allows_charging = False
             return
 
-        # 2. Climate Throttle Logic
+        # 3. Climate Throttle Logic
         assumed_rate = max_rate
         if temp_id:
             min_expected_temp = None
@@ -448,7 +458,7 @@ class SmartEVCCEMS:
         hours_needed = math.ceil(energy_needed_kwh / assumed_rate)
         _LOGGER.debug("Need %.1fkWh at assumed rate %.1fkW -> %d hours requested.", energy_needed_kwh, assumed_rate, hours_needed)
 
-        # 3. Price Optimization
+        # 4. Price Optimization
         nordpool_state = self.hass.states.get(nordpool_id)
         if not nordpool_state or "today" not in nordpool_state.attributes:
             _LOGGER.error("Nordpool state or attributes missing! Allowing charging by default.")

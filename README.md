@@ -43,3 +43,15 @@ Inga yaml-filer behövs - komponenten stöder fullständig Home Assistant Config
 4. Sök fram "SmartEVCC" och klicka!
 
 *I guiden som dyker upp mappar du enkelt vilka entiteter (P1, Nordpool, Bil) din Home Assistant har.*
+
+| Meny / Tabb | Vad gör den? | Example Entities |
+| :--- | :--- | :--- |
+| **Huvudsäkring** | Siffra på hur mycket ditt tak är per fas. Fritext: T.ex. 16, 20 eller 17.5A. | *`16`* |
+| **P1 Fas 1-3** | Sensorer som visar strömförbrukningen i realtid. | *`sensor.p1_fas_1_current`* |
+| **Zaptec Ladd-Amp** | The number-entity som ställer amp på boxen. | *`number.zaptec_id_max_laddstrom`* |
+| **Nordpool Entity** | Nuvarande timpris-entitet från t.ex. HACS-Nordpool. | *`sensor.nordpool_kwh_se3`* |
+| **EV Battery Level** | Sensor som visar bilens nuvarande SoC (State of Charge). | *`sensor.id4_battery_level`* |
+| **EV Min SoC** | Nödladdning! %-gräns där bilen alltid laddar oavsett om elen är dyr. | *`20`* |
+| **EV Target Level** | Din önskade målnivå på morgonen. | *`80`* |
+| **EV Temp Sensor** | En `weather`- eller `sensor`-entitet för utetemperatur. | *`weather.smhi_home`* |
+| **Load Shedding** | Slå av/på smart relä-kontroll, och välj entiteter ur flervalslistor. | *Välj WWB för Nivå 1* |

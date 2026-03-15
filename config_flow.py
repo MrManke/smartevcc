@@ -25,6 +25,7 @@ from .const import (
     CONF_EV_COLD_CHARGE_RATE,
     CONF_EV_COLD_TEMP_THRESHOLD,
     CONF_EV_MAX_CHARGE_RATE,
+    CONF_EV_MIN_SOC,
     CONF_EV_TARGET_LEVEL,
     CONF_EV_TEMP_SENSOR,
     CONF_MAIN_FUSE,
@@ -42,6 +43,7 @@ from .const import (
     DEFAULT_EV_COLD_CHARGE_RATE,
     DEFAULT_EV_COLD_TEMP_THRESHOLD,
     DEFAULT_EV_MAX_CHARGE_RATE,
+    DEFAULT_EV_MIN_SOC,
     DEFAULT_EV_TARGET_LEVEL,
     DEFAULT_MAIN_FUSE,
     DOMAIN,
@@ -59,7 +61,7 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_MAIN_FUSE, default=data.get(CONF_MAIN_FUSE, DEFAULT_MAIN_FUSE)
             ): NumberSelector(
                 NumberSelectorConfig(
-                    min=10, max=63, step=1, mode=NumberSelectorMode.BOX
+                    min=10.0, max=63.0, step=1.0, mode=NumberSelectorMode.BOX
                 )
             ),
             vol.Required(
@@ -83,6 +85,9 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
             vol.Required(
                 CONF_EV_BATTERY_LEVEL, default=data.get(CONF_EV_BATTERY_LEVEL, vol.UNDEFINED)
             ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            vol.Required(
+                CONF_EV_MIN_SOC, default=data.get(CONF_EV_MIN_SOC, DEFAULT_EV_MIN_SOC)
+            ): NumberSelector(NumberSelectorConfig(min=0, max=100, step=1, mode=NumberSelectorMode.SLIDER)),
             vol.Required(
                 CONF_EV_TARGET_LEVEL, default=data.get(CONF_EV_TARGET_LEVEL, DEFAULT_EV_TARGET_LEVEL)
             ): NumberSelector(NumberSelectorConfig(min=10, max=100, step=1, mode=NumberSelectorMode.SLIDER)),
