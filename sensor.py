@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 STATUS_SENSOR = SensorEntityDescription(
     key="smartevcc_status",
-    name="Status",
+    name="Systemstatus",
     icon="mdi:ev-station",
 )
 
@@ -122,10 +122,45 @@ class SmartEVCCWeatherForecastSensor(SensorEntity):
     @property
     def native_value(self) -> float | None:
         """Return the lowest expected temperature."""
-        return self.ems.lowest_expected_temp
+        return self._attr_native_value
+
+    @property
+    def should_poll(self) -> bool:
+        """Return True so HA polls this sensor regularly."""
+        return True
+
+    async def async_update(self) -> None:
+        """Fetch weather forecast for Stugan and update minimum temperature."""
+        try:
+            response = await self.hass.services.async_call(
+                "weather",
+                "get_forecasts",
+                {"entity_id": "weather.forecast_stugan", "type": "hourly"},
+                blocking=True,
+                return_response=True,
+            )
+            if isinstance(response, dict):
+                forecasts = response.get("weather.forecast_stugan", {}).get("forecast", [])
+                if forecasts:
+                    temps = []
+                    for f in forecasts[:24]:
+                        if f.get("temperature") is not None:
+                            temps.append(f.get("temperature"))
+                        elif f.get("templow") is not None:
+                            temps.append(f.get("templow"))
+                    if temps:
+                        self._attr_native_value = min(temps)
+                        self.ems.lowest_expected_temp = self._attr_native_value
+                        return
+        except Exception as e:
+            _LOGGER.error("SmartEVCCWeatherForecastSensor: Failed to fetch weather forecast: %s", e)
+            
+        # Fallback to whatever EMS computed if the service call failed
+        self._attr_native_value = self.ems.lowest_expected_temp
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks when the entity is added to Home Assistant."""
+        self._attr_native_value = None
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,

@@ -27,6 +27,8 @@
           "shedding_level_1_switches": "Nivå 1 Switchar (VVB etc)",
           "shedding_level_2_switches": "Nivå 2 Switchar (Element etc)",
           "shedding_climates": "Nivå 3: Klimatanläggningar (Sänks med 3 grader)",
+          "one_phase_fallback": "1-fas Fallback (vid snedbelastning)",
+          "price_spike_override": "Prisspik-Override (100%)",
           "debug_mode": "Aktivera utökad felsökning (JSON-loggning)"
         }
       }
@@ -68,6 +70,8 @@
           "shedding_level_1_switches": "Nivå 1 Switchar (VVB etc)",
           "shedding_level_2_switches": "Nivå 2 Switchar (Element etc)",
           "shedding_climates": "Nivå 3: Klimatanläggningar (Sänks)",
+          "one_phase_fallback": "1-fas Fallback (vid snedbelastning)",
+          "price_spike_override": "Prisspik-Override (100%)",
           "debug_mode": "Aktivera utökad felsökning"
         }
       }

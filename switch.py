@@ -18,19 +18,19 @@ _LOGGER = logging.getLogger(__name__)
 
 FORCE_CHARGE_SWITCH = SwitchEntityDescription(
     key="force_charge",
-    name="Force Charge",
+    name="Tvinga laddning",
     icon="mdi:lightning-bolt",
 )
 
 ENABLE_LOAD_SHEDDING_SWITCH = SwitchEntityDescription(
     key="enable_load_shedding",
-    name="Load Shedding",
+    name="Lastbalansering",
     icon="mdi:power-socket-eu",
 )
 
 DEBUG_MODE_SWITCH = SwitchEntityDescription(
     key="debug_mode",
-    name="Debug Mode",
+    name="Felsökningsläge",
     icon="mdi:bug",
 )
 
@@ -42,7 +42,7 @@ SPIKE_OVERRIDE_SWITCH = SwitchEntityDescription(
 
 PHASE_BALANCING_SWITCH = SwitchEntityDescription(
     key="one_phase_fallback",
-    name="1-fas Fallback (vid snedbelastning)",
+    name="1-fas Fallback",
     icon="mdi:current-ac",
 )
 

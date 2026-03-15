@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 NUMBERS: tuple[NumberEntityDescription, ...] = (
     NumberEntityDescription(
         key="max_price_limit",
-        name="Max Price Limit",
+        name="Maxpris laddning",
         icon="mdi:cash-remove",
         native_min_value=-10.0,
         native_max_value=10.0,
@@ -27,7 +27,7 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="low_price_charging_limit",
-        name="Low Price Limit",
+        name="Tröskel för billigt pris",
         icon="mdi:cash-plus",
         native_min_value=-10.0,
         native_max_value=10.0,
@@ -36,7 +36,7 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="main_fuse",
-        name="Main Fuse",
+        name="Huvudsäkring",
         icon="mdi:fuse",
         native_min_value=10.0,
         native_max_value=63.0,
@@ -45,7 +45,7 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="ev_min_soc",
-        name="EV Min SoC",
+        name="Nödladdning (Min SoC)",
         icon="mdi:battery-alert",
         native_min_value=0.0,
         native_max_value=100.0,
@@ -54,7 +54,7 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="ev_target_level",
-        name="EV Target Level",
+        name="Målnivå (Target SoC)",
         icon="mdi:battery-charging-100",
         native_min_value=0.0,
         native_max_value=100.0,
@@ -63,7 +63,7 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="ev_battery_capacity",
-        name="EV Battery Capacity",
+        name="Batterikapacitet",
         icon="mdi:car-battery",
         native_min_value=10.0,
         native_max_value=200.0,
@@ -72,7 +72,7 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="ev_max_charge_rate",
-        name="EV Max Charge Rate",
+        name="Maximal Laddeffekt",
         icon="mdi:ev-station",
         native_min_value=1.0,
         native_max_value=22.0,
@@ -81,7 +81,7 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="ev_cold_temp_threshold",
-        name="Cold Temp Threshold",
+        name="Köldgräns för lägre laddeffekt",
         icon="mdi:thermometer-minus",
         native_min_value=-30.0,
         native_max_value=20.0,
@@ -90,7 +90,7 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="ev_cold_charge_rate",
-        name="Cold Charge Rate",
+        name="Assumerad Laddeffekt vid extremkyla",
         icon="mdi:snowflake",
         native_min_value=1.0,
         native_max_value=22.0,
@@ -99,7 +99,7 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="recovery_duration",
-        name="Recovery Duration",
+        name="Väntetid för upprampning",
         icon="mdi:timer-sand",
         native_min_value=10.0,
         native_max_value=600.0,
@@ -136,7 +136,7 @@ class SmartEVCCNumber(RestoreEntity, NumberEntity):
             manufacturer="SmartEVCC",
             model="Local EMS",
         )
-        self._attr_mode = "slider"
+        self._attr_mode = "box"
         self._attr_native_value = 0.0
 
     async def async_added_to_hass(self) -> None:

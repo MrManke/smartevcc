@@ -585,16 +585,8 @@ class SmartEVCCEMS:
         l3_id = data.get(CONF_P1_PHASE_3)
 
         l1_amps = self._get_float_state(l1_id)
-        if l1_amps is not None and l1_amps > 100:
-            l1_amps = l1_amps / 230.0
-
         l2_amps = self._get_float_state(l2_id)
-        if l2_amps is not None and l2_amps > 100:
-            l2_amps = l2_amps / 230.0
-
         l3_amps = self._get_float_state(l3_id)
-        if l3_amps is not None and l3_amps > 100:
-            l3_amps = l3_amps / 230.0
 
         fuse_limit = self.main_fuse
         safe_limit = fuse_limit - 0.5  # e.g. 15.5A for 16A fuse
