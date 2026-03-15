@@ -6,6 +6,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.helpers.selector import (
     BooleanSelector,
     EntitySelector,
@@ -66,13 +67,13 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
             ),
             vol.Required(
                 CONF_P1_PHASE_1, default=data.get(CONF_P1_PHASE_1, vol.UNDEFINED)
-            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.CURRENT)),
             vol.Required(
                 CONF_P1_PHASE_2, default=data.get(CONF_P1_PHASE_2, vol.UNDEFINED)
-            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.CURRENT)),
             vol.Required(
                 CONF_P1_PHASE_3, default=data.get(CONF_P1_PHASE_3, vol.UNDEFINED)
-            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.CURRENT)),
             vol.Required(
                 CONF_CHARGER_CONTROL_ENTITY,
                 default=data.get(CONF_CHARGER_CONTROL_ENTITY, vol.UNDEFINED),
@@ -84,7 +85,7 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
             ): EntitySelector(EntitySelectorConfig(domain="sensor")),
             vol.Required(
                 CONF_EV_BATTERY_LEVEL, default=data.get(CONF_EV_BATTERY_LEVEL, vol.UNDEFINED)
-            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.BATTERY)),
             vol.Required(
                 CONF_EV_MIN_SOC, default=data.get(CONF_EV_MIN_SOC, DEFAULT_EV_MIN_SOC)
             ): NumberSelector(NumberSelectorConfig(min=0, max=100, step=1, mode=NumberSelectorMode.SLIDER)),
@@ -99,7 +100,7 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
             ): NumberSelector(NumberSelectorConfig(min=1.0, max=22.0, step=0.1, mode=NumberSelectorMode.BOX)),
             vol.Required(
                 CONF_EV_TEMP_SENSOR, default=data.get(CONF_EV_TEMP_SENSOR, vol.UNDEFINED)
-            ): EntitySelector(EntitySelectorConfig(domain=["sensor", "weather"])),
+            ): EntitySelector(EntitySelectorConfig(domain=["sensor", "weather"], device_class=SensorDeviceClass.TEMPERATURE)),
             vol.Required(
                 CONF_EV_COLD_TEMP_THRESHOLD, default=data.get(CONF_EV_COLD_TEMP_THRESHOLD, DEFAULT_EV_COLD_TEMP_THRESHOLD)
             ): NumberSelector(NumberSelectorConfig(min=-30.0, max=0.0, step=0.5, mode=NumberSelectorMode.BOX)),

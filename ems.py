@@ -686,6 +686,7 @@ class SmartEVCCEMS:
                     self._set_state("Idle")
 
         if self.debug_mode:
+            _LOGGER.debug("SmartEVCC Fast Loop - Phase Loads: %s | Limit: %sA | Decision: %s", loads, safe_limit, decision)
             # Run the file I/O safely in an executor to not block the async loop
             await self.hass.async_add_executor_job(
                 self._dump_debug_data, loads, safe_limit, decision
