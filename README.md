@@ -1,36 +1,45 @@
-# SmartEVCC - Custom Home Assistant Component
+# SmartEVCC (Custom Component för Home Assistant)
 
-SmartEVCC är ett lokalt energihanteringssystem (EMS) för Home Assistant, speciellt utformat för att balansera och optimera elbilsladdning i kombination med hemmets övriga förbrukning.
+En intelligent, lokal "dirigent" för hemmets elförbrukning som maximerar laddhastighet för elbil till lägsta pris, utan att riskera huvudsäkringen. 
 
-Komponenten är byggd med en unik **Dual Loop-arkitektur** för att separera snabbt överlastskydd från långsammare prisoptimering.
+Integrationen drar tung inspiration från de populära projekten [**evcc.io**](https://github.com/evcc-io/evcc) och [**EV Smart Charging**](https://github.com/jonasbkarlsson/ev_smart_charging), för att erbjuda en svårslagen kombination av lokalt blixtsnabbt fas-skydd och automatiserad nordpool-prissättning – byggt direkt i Home Assistant utan externa driftberoenden (som MQTT-servrar eller separata Docker-containrar).
 
-## Funktioner
+## Huvudfunktioner
 
-### Snabba Loopen (Säkringsskydd & Lastbalansering - Fas 1-3)
-- **Körs var 10:e sekund** för att läsa av fasströmmar (t.ex. från P1-mätare).
-- **Hysteres och Anti-Flapping:** Mindre överlaster tolereras i 60 sekunder, medan allvarliga överlaster triggar åtgärd på 10 sekunder. Systemet har en 3 minuters minnes-hysteres vid återställning.
-- **Fail-safe:** Om komponenten tappar kontakt med P1-mätaren i mer än 30 sekunder faller Zaptec-laddaren tillbaka till minimum (6A) automatiskt.
-- **Level 1 Defense (Zaptec API):** Drar stegvis ned Zaptec-laddarens ström till minimum (6A).
-- **Level 2 Defense (Load Shedding - Valbart):** Om huset fortfarande är överbelastat trots att be bilen laddar på 6A, börjar systemet automatiskt stänga av prioriterade laster i lager:
-  1. **Nivå 1 Switchar:** Slår av reläer (t.ex. mindre Varmvattenberedare).
-  2. **Nivå 2 Switchar:** Slår av tyngre laster (t.ex. element).
-  3. **Klimat / Värmepumpar (Automatisk logik):** Sänker värmen eller höjer kylan med 3°C för att spara ström, utan att stänga av maskinen helt. Sparar det ursprungliga läget och återställer dynamiskt (LIFO) när strömmen är säker igen.
-- **Zaptec Pause (Level 3 Defense):** Om inga laster finns kvar att stänga av, pausas Zaptec-laddaren helt. 
+1. **Dual-Loop Arkitektur**
+   * **Fast Loop (Säkringsskydd - 10 s):** Övervakar lokala mätvärden (t.ex. P1/Han-port) var 10:e sekund för omedelbart ingripande. Vid överlast reagerar systemet direkt för att undvika att husets huvudsäkring går. Den filtrerar "startspikar" (ex. från kylskåp) för att undvika onödiga avbrott (Anti-Flapping).
+   * **Slow Loop (Prisplanerare - 1 h):** Vaknar varje timme och bygger en "hink" av energi som behöver fyllas innan avfärd. Letar upp morgondagens Nordpool-priser och schemalägger laddningen på de absolut billigaste timmarna.
 
-### Långsamma Loopen (Pris- & Kapacitetsplaneraren - Fas 4)
-- **Körs varje timme** för att beräkna framtida laddbehov fram till din angivna avfärdstid.
-- **Köldpåverkan (Climate Throttle):** Om utomhus/batteritemperaturen understiger valt gränsvärde (t.ex. -4°C) ställer systemet om kalkylen till en lägre förväntad maxeffekt (t.ex. 4 kW) och bokar in *fler* timmar än vanligt för att hinna nå målet.
-- **Price Optimization:** Hämtar och pusslar ihop de billigaste timmarna från Nordpool. Om nuvarande timme ligger utanför listan tvingas Zaptecen ned i viloläge/minimiström.
+2. **Smart Köldkompensation (Proaktiv Throttling)**
+   Kalla elbilsbatterier (särskilt de från MEB-plattformen, som ID.4) tar inte emot laddning lika fort.
+   Integrationen analyserar nästa dygns **väderprognos** (`weather`-entiteter) eller en specifik **temperatursensor**. Dippar värdet för de kommande timmarna under en viss angiven kyla, beräknar Slow Loop proaktivt med att ladda på "lägre effekt" (t.ex 4 kW istället för 11 kW) och tillsätter automatiskt fler billiga timmar under natten. Resultatet är att bilen *alltid* är full när du ska åka, även om det var 10 minusgrader och bilen inte tog emot ström lika fort som på sommaren.
 
-### Status-Sensor (State Machine - Fas 5)
-- Integrerad `sensor.smartevcc_status` uppdateras i realtid (Idle, Charging, Shedding, Fuse_Protect_Paused, Price_Wait) för att visualisera vad systemet gör direkt i dina dashboards.
+3. **Hierarkisk Load Shedding (Dropp-lista)**
+   När Zaptec dragits ner till sin absoluta minimumnivå (6A) och säkringen fortfarande hotas, släcker komponenten metodiskt ner utvald last i en kaskad, och startar sedan upp den igen mjukt när faran är över:
+   * **Nivå 1:** Mindre/enklare switchar (t.ex. Varmvattenberedare)
+   * **Nivå 2:** Tyngre laster (t.ex. stora elelement)
+   * **Nivå 3:** Golvvärme sänks intelligent! (3 graders offset)
 
-## Konfiguration (UI)
-Ingen YAML krävs! Hela systemet konfigureras direkt via Home Assistants gränssnitt med dynamiska selectors. Ändra valda switchar, värmepumpar, P1-sensorer eller Nordpool-entiteter i farten genom "Integrationer -> SmartEVCC -> Konfigurera".
+4. **Säker & Responsiv Fail-Safe**
+   * **Ingen kommunikation** med P1-mätare? Systemet ställer omedelbart ner laddboxen till max 6A som säkerhetsåtgärd.
+   * **Dyr tjuvladdning stoppas:** Ligger bilen på faser där priset är högt blockerar komponenten minsta strömmen genom en ren *avstängning* (`switch.turn_off` på laddaren). Det förhindrar den där konstanta, dryga 4 kW-förlusten ("tjuvladdning") som annars kan ske.
 
-## Installation
+## Interactive UI Control
 
+När komponenten ligger i drift skapar den tre stycken reglage som du sätter i ditt grafiska Lovelace-gränssnitt för att styra beteendet "på the fly" utan att öppna konfiguratorn:
+
+* **[Number] Smartevcc Max Price Limit**
+  Styr en absolut smärtgräns i kronor. Skjuter priset över denna gräns laddas inte bilen oavsett hur tom den är. 
+* **[Number] Smartevcc Low Price Charging Limit**
+  Om timpriset dippar under detta värde kastas alla "scheman" och "hink-kalkyler" i papperskorgen – ladda för fullt, strömmen är så billig att det inte spelar någon roll.
+* **[Switch] Smartevcc Force Charge**
+  Override-knappen. Tryck in denna för att tvinga bilen att ladda nu. *Notera att systemet givetvis fortfarande är skyddat av Fast Loop och P1-mätaren även när du vrider på denna.*
+
+## Installation & Konfiguration
+Inga yaml-filer behövs - komponenten stöder fullständig Home Assistant Config Flow.
 1. Kopiera foldern `smartevcc` till din `custom_components`-mapp i Home Assistant.
 2. Starta om Home Assistant.
 3. Gå till **Inställningar -> Enheter och tjänster -> Lägg till integration**.
-4. Sök efter "SmartEVCC" och följ installationsguiden.
+4. Sök fram "SmartEVCC" och klicka!
+
+*I guiden som dyker upp mappar du enkelt vilka entiteter (P1, Nordpool, Bil) din Home Assistant har.*
