@@ -66,7 +66,7 @@ Inga yaml-filer behövs - komponenten stöder fullständig Home Assistant Config
 | Meny / Tabb | Vad gör den? | Example Entities |
 | :--- | :--- | :--- |
 | **Huvudsäkring** | Siffra på hur mycket ditt tak är per fas. Fritext: T.ex. 16, 20 eller 17.5A. | *`16`* |
-| **P1 Fas 1-3** | Sensorer som visar strömförbrukningen i realtid. | *`sensor.p1_fas_1_current`* |
+| **P1 Fas 1-3** | Sensorer som visar strömmen i råa Ampere (t.ex. från P1/HomeWizard). | *`sensor.p1_fas_1_current_a`* |
 | **Zaptec Ladd-Amp** | The number-entity som ställer amp på boxen. | *`number.zaptec_id_max_laddstrom`* |
 | **Charger Status** | Valfri sensor som visar om bilen är inkopplad för att stoppa onödiga anrop. | *`sensor.zaptec_id_laddstatus`* |
 | **Zaptec Fas-läge** | Valfri sensor/select för att bestämma 1-fas eler 3-fasläge för fallback funktionen | *`select.zaptec_id_operating_mode`* |
