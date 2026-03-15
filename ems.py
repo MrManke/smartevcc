@@ -54,7 +54,7 @@ OVERLOAD_DURATION_MINOR = 60  # seconds before action on minor overload
 OVERLOAD_DURATION_SEVERE = 10  # seconds before action on severe overload
 SEVERE_OVERLOAD_MARGIN = 1.5  # Amps above safe_limit
 RECOVERY_DURATION = 180  # 3 minutes continuous below safe limit
-RECOVERY_MARGIN = 1.5  # Amps below safe limit
+RECOVERY_MARGIN = 1.0  # Amps below safe limit
 ZAPTEC_MIN_AMPS = 6.0
 CLIMATE_ADJUST_TEMP = 3.0
 
@@ -84,6 +84,11 @@ class SmartEVCCEMS:
 
         # Sensor State Machine
         self.current_state: str = "Idle"
+
+        # Toggled Options from UI Entities (Switch / Number)
+        self.force_charge: bool = False
+        self.max_price_limit: float = 0.0
+        self.low_price_charging_limit: float = 0.0
 
     def _set_state(self, new_state: str) -> None:
         """Update the component state and notify listeners."""
@@ -296,9 +301,10 @@ class SmartEVCCEMS:
         _LOGGER.warning(
             "SmartEVCC: Max limit exceeded, Zaptec is at min, and no more loads to shed! Pausing Zaptec."
         )
-        if self.zaptec_charger:
+        zaptec_entity = self.zaptec_charger
+        if zaptec_entity:
             # Attempt to derive the switch name if a number entity was provided, or just use domain 'switch'
-            zaptec_switch = self.zaptec_charger.replace("number.", "switch.").replace("_max_laddstrom", "_laddar")
+            zaptec_switch = zaptec_entity.replace("number.", "switch.").replace("_max_laddstrom", "_laddar")
             if "zaptec" not in zaptec_switch:
                 zaptec_switch = "switch.zaptec_go_laddar"
             
@@ -453,7 +459,30 @@ class SmartEVCCEMS:
         sorted_prices = sorted(all_future_prices, key=lambda x: x["price"])
         cheapest_hours = sorted_prices[:hours_needed]
 
-        # Is the CURRENT hour in the cheapest list?
+        # PRIORITY 1: Low Price Limit
+        # Check if the current hour's price is below the low_price_charging_limit
+        current_price = today_prices[current_hour] if current_hour < len(today_prices) else 0.0
+        if current_price < self.low_price_charging_limit:
+            self._price_allows_charging = True
+            self._slow_loop_last_run = f"Charging allowed: Price ({current_price:.2f}) < Low Limit ({self.low_price_charging_limit:.2f})"
+            _LOGGER.info(self._slow_loop_last_run)
+            return
+
+        # PRIORITY 2: Force Charge
+        if self.force_charge:
+            self._price_allows_charging = True
+            self._slow_loop_last_run = "Charging allowed: Force Charge is ON"
+            _LOGGER.info(self._slow_loop_last_run)
+            return
+
+        # PRIORITY 3: Max Price Limit
+        if current_price > self.max_price_limit and self.max_price_limit > 0:
+            self._price_allows_charging = False
+            self._slow_loop_last_run = f"Charging blocked: Price ({current_price:.2f}) > Max Limit ({self.max_price_limit:.2f})"
+            _LOGGER.info(self._slow_loop_last_run)
+            return
+
+        # PRIORITY 4: Normal Schedule
         charge_now = any(h["hour"] == current_hour and h["day"] == "today" for h in cheapest_hours)
         
         self._price_allows_charging = charge_now
@@ -489,9 +518,19 @@ class SmartEVCCEMS:
             decision = "Price Planner: Paused"
             self._set_state("Price_Wait")
             
-            zaptec_amps = self._get_zaptec_amps()
-            if zaptec_amps is None or zaptec_amps > ZAPTEC_MIN_AMPS:
-                await self._set_zaptec_amps(ZAPTEC_MIN_AMPS)
+            zaptec_entity = self.zaptec_charger
+            if zaptec_entity:
+                # Attempt to derive the switch name if a number entity was provided, or just use domain 'switch'
+                zaptec_switch = zaptec_entity.replace("number.", "switch.").replace("_max_laddstrom", "_laddar")
+                if "zaptec" not in zaptec_switch:
+                    zaptec_switch = "switch.zaptec_go_laddar"
+                
+                state = self.hass.states.get(zaptec_switch)
+                if not state or state.state != "off":
+                    _LOGGER.info("Pausing Zaptec charger via %s", zaptec_switch)
+                    await self.hass.services.async_call(
+                        "switch", "turn_off", {"entity_id": zaptec_switch}, blocking=False
+                    )
             
             # If we're forcing 6A/paused, don't execute the rest of the limit recovery loop
             # BUT we still need to process P1 missing logic first.
@@ -575,7 +614,25 @@ class SmartEVCCEMS:
 
                     if now_ts - safe_start >= RECOVERY_DURATION:
                         decision += " -> ACTION TAKEN"
-                        await self._restore_previous_load()
+                        
+                        zaptec_turned_on = False
+                        zaptec_entity = self.zaptec_charger
+                        if zaptec_entity:
+                            zaptec_switch = zaptec_entity.replace("number.", "switch.").replace("_max_laddstrom", "_laddar")
+                            if "zaptec" not in zaptec_switch:
+                                zaptec_switch = "switch.zaptec_go_laddar"
+                            
+                            state = self.hass.states.get(zaptec_switch)
+                            if state and state.state == "off":
+                                zaptec_turned_on = True
+                                _LOGGER.info("Recovery: Resuming Zaptec charger via %s", zaptec_switch)
+                                await self.hass.services.async_call(
+                                    "switch", "turn_on", {"entity_id": zaptec_switch}, blocking=False
+                                )
+                        
+                        if not zaptec_turned_on:
+                            await self._restore_previous_load()
+                            
                         self._safe_start_time = now_ts  # Reset
                 else:
                     # In hysteresis deadband (safe_limit - 1.5 <= max_current <= safe_limit)
