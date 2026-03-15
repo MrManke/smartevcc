@@ -96,8 +96,8 @@ class SmartEVCCEMS:
         self.force_charge: bool = False
         self.max_price_limit: float = 0.0
         self.low_price_charging_limit: float = 0.0
-        self.spike_override: bool = False
-        self.phase_balancing: bool = False
+        self.price_spike_override: bool = False
+        self.one_phase_fallback: bool = False
         
         # New Dynamic UI Entities (Loaded from Config once on boot, then managed by UI)
         self.main_fuse: float = float(config_entry.options.get(CONF_MAIN_FUSE, config_entry.data.get(CONF_MAIN_FUSE, DEFAULT_MAIN_FUSE)))
@@ -508,7 +508,7 @@ class SmartEVCCEMS:
             return
 
         # SPIKE OVERRIDE CHECK
-        if self.spike_override and today_prices and tomorrow_prices:
+        if self.price_spike_override and today_prices and tomorrow_prices:
             today_avg = sum(today_prices) / len(today_prices)
             tomorrow_max = max(tomorrow_prices)
             spike_threshold = 1.50  # SEK difference threshold
@@ -694,7 +694,7 @@ class SmartEVCCEMS:
 
         if max_current is not None:
             # PHASE BALANCING CHECK (Intercept Overload)
-            if self.phase_balancing and self.zaptec_phase_entity:
+            if self.one_phase_fallback and self.zaptec_phase_entity:
                 l1 = loads.get("L1")
                 if l1 is None:
                     l1 = 0.0
@@ -778,7 +778,7 @@ class SmartEVCCEMS:
                         if not zaptec_turned_on:
                             # PHASE BALANCING RESTORE
                             phase_restored = False
-                            if self.phase_balancing and self.zaptec_phase_entity and headroom >= 6.0:
+                            if self.one_phase_fallback and self.zaptec_phase_entity and headroom >= 6.0:
                                 state = self.hass.states.get(self.zaptec_phase_entity)
                                 if state and str(state.state) == "1":
                                     _LOGGER.info("Headroom restored! Upgrading Zaptec back to 3-phase mode.")

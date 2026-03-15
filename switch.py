@@ -35,14 +35,14 @@ DEBUG_MODE_SWITCH = SwitchEntityDescription(
 )
 
 SPIKE_OVERRIDE_SWITCH = SwitchEntityDescription(
-    key="spike_override",
+    key="price_spike_override",
     name="Prisspik-Override (100%)",
     icon="mdi:lightning-bolt-circle",
 )
 
 PHASE_BALANCING_SWITCH = SwitchEntityDescription(
-    key="phase_balancing",
-    name="1-fas Fallback",
+    key="one_phase_fallback",
+    name="1-fas Fallback (vid snedbelastning)",
     icon="mdi:current-ac",
 )
 
