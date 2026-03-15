@@ -62,7 +62,7 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_MAIN_FUSE, default=data.get(CONF_MAIN_FUSE, DEFAULT_MAIN_FUSE)
             ): NumberSelector(
                 NumberSelectorConfig(
-                    min=10.0, max=63.0, step=1.0, mode=NumberSelectorMode.BOX
+                    min=10.0, max=63.0, step=1.0, mode=NumberSelectorMode.SLIDER
                 )
             ),
             vol.Required(
@@ -91,22 +91,22 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
             ): NumberSelector(NumberSelectorConfig(min=0, max=100, step=1, mode=NumberSelectorMode.SLIDER)),
             vol.Required(
                 CONF_EV_TARGET_LEVEL, default=data.get(CONF_EV_TARGET_LEVEL, DEFAULT_EV_TARGET_LEVEL)
-            ): NumberSelector(NumberSelectorConfig(min=10, max=100, step=1, mode=NumberSelectorMode.SLIDER)),
+            ): NumberSelector(NumberSelectorConfig(min=0, max=100, step=1, mode=NumberSelectorMode.SLIDER)),
             vol.Required(
                 CONF_EV_BATTERY_CAPACITY, default=data.get(CONF_EV_BATTERY_CAPACITY, DEFAULT_EV_BATTERY_CAPACITY)
-            ): NumberSelector(NumberSelectorConfig(min=10.0, max=150.0, step=1.0, mode=NumberSelectorMode.BOX)),
+            ): NumberSelector(NumberSelectorConfig(min=10.0, max=200.0, step=1.0, mode=NumberSelectorMode.SLIDER)),
             vol.Required(
                 CONF_EV_MAX_CHARGE_RATE, default=data.get(CONF_EV_MAX_CHARGE_RATE, DEFAULT_EV_MAX_CHARGE_RATE)
-            ): NumberSelector(NumberSelectorConfig(min=1.0, max=22.0, step=0.1, mode=NumberSelectorMode.BOX)),
+            ): NumberSelector(NumberSelectorConfig(min=1.0, max=22.0, step=0.1, mode=NumberSelectorMode.SLIDER)),
             vol.Required(
                 CONF_EV_TEMP_SENSOR, default=data.get(CONF_EV_TEMP_SENSOR, vol.UNDEFINED)
             ): EntitySelector(EntitySelectorConfig(domain=["sensor", "weather"], device_class=SensorDeviceClass.TEMPERATURE)),
             vol.Required(
                 CONF_EV_COLD_TEMP_THRESHOLD, default=data.get(CONF_EV_COLD_TEMP_THRESHOLD, DEFAULT_EV_COLD_TEMP_THRESHOLD)
-            ): NumberSelector(NumberSelectorConfig(min=-30.0, max=0.0, step=0.5, mode=NumberSelectorMode.BOX)),
+            ): NumberSelector(NumberSelectorConfig(min=-30.0, max=20.0, step=1.0, mode=NumberSelectorMode.SLIDER)),
             vol.Required(
                 CONF_EV_COLD_CHARGE_RATE, default=data.get(CONF_EV_COLD_CHARGE_RATE, DEFAULT_EV_COLD_CHARGE_RATE)
-            ): NumberSelector(NumberSelectorConfig(min=1.0, max=22.0, step=0.1, mode=NumberSelectorMode.BOX)),
+            ): NumberSelector(NumberSelectorConfig(min=1.0, max=22.0, step=0.1, mode=NumberSelectorMode.SLIDER)),
             vol.Required(
                 CONF_DEPARTURE_TIME, default=data.get(CONF_DEPARTURE_TIME, DEFAULT_DEPARTURE_TIME)
             ): selector.TimeSelector(),
@@ -133,13 +133,63 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
             vol.Optional(
                 CONF_SHEDDING_CLIMATES, default=data.get(CONF_SHEDDING_CLIMATES, [])
             ): EntitySelector(EntitySelectorConfig(domain="climate", multiple=True)),
-            vol.Optional(
-                CONF_DEBUG_MODE,
-                default=data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE),
-            ): BooleanSelector(),
         }
     )
 
+
+def _get_options_schema(data: dict[str, Any] | None = None) -> vol.Schema:
+    """Return the options schema, stripping out entities now handled by UI (numbers, toggle)."""
+    if data is None:
+        data = {}
+
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_P1_PHASE_1, default=data.get(CONF_P1_PHASE_1, vol.UNDEFINED)
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.CURRENT)),
+            vol.Required(
+                CONF_P1_PHASE_2, default=data.get(CONF_P1_PHASE_2, vol.UNDEFINED)
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.CURRENT)),
+            vol.Required(
+                CONF_P1_PHASE_3, default=data.get(CONF_P1_PHASE_3, vol.UNDEFINED)
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.CURRENT)),
+            vol.Required(
+                CONF_CHARGER_CONTROL_ENTITY,
+                default=data.get(CONF_CHARGER_CONTROL_ENTITY, vol.UNDEFINED),
+            ): EntitySelector(EntitySelectorConfig(domain="number")),
+            
+            # Phase 4: Nordpool & EV Planner Configs
+            vol.Required(
+                CONF_NORDPOOL_ENTITY, default=data.get(CONF_NORDPOOL_ENTITY, vol.UNDEFINED)
+            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            vol.Required(
+                CONF_EV_BATTERY_LEVEL, default=data.get(CONF_EV_BATTERY_LEVEL, vol.UNDEFINED)
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.BATTERY)),
+            vol.Required(
+                CONF_EV_TEMP_SENSOR, default=data.get(CONF_EV_TEMP_SENSOR, vol.UNDEFINED)
+            ): EntitySelector(EntitySelectorConfig(domain=["sensor", "weather"], device_class=SensorDeviceClass.TEMPERATURE)),
+            vol.Required(
+                CONF_DEPARTURE_TIME, default=data.get(CONF_DEPARTURE_TIME, DEFAULT_DEPARTURE_TIME)
+            ): selector.TimeSelector(),
+
+            # Shedding settings
+            vol.Optional(
+                CONF_SHEDDING_LEVEL_1_SWITCHES,
+                default=data.get(CONF_SHEDDING_LEVEL_1_SWITCHES, []),
+            ): EntitySelector(
+                EntitySelectorConfig(domain=["switch", "input_boolean"], multiple=True)
+            ),
+            vol.Optional(
+                CONF_SHEDDING_LEVEL_2_SWITCHES,
+                default=data.get(CONF_SHEDDING_LEVEL_2_SWITCHES, []),
+            ): EntitySelector(
+                EntitySelectorConfig(domain=["switch", "input_boolean"], multiple=True)
+            ),
+            vol.Optional(
+                CONF_SHEDDING_CLIMATES, default=data.get(CONF_SHEDDING_CLIMATES, [])
+            ): EntitySelector(EntitySelectorConfig(domain="climate", multiple=True)),
+        }
+    )
 
 class SmartEVCCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for SmartEVCC."""
@@ -187,5 +237,5 @@ class SmartEVCCOptionsFlowHandler(config_entries.OptionsFlow):
         current_config.update(self.config_entry.options)
 
         return self.async_show_form(
-            step_id="init", data_schema=_get_base_schema(current_config)
+            step_id="init", data_schema=_get_options_schema(current_config)
         )

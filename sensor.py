@@ -17,7 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 STATUS_SENSOR = SensorEntityDescription(
     key="smartevcc_status",
-    name="SmartEVCC Status",
+    name="Status",
     icon="mdi:ev-station",
 )
 

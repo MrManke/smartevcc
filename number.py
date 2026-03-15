@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 NUMBERS: tuple[NumberEntityDescription, ...] = (
     NumberEntityDescription(
         key="max_price_limit",
-        name="SmartEVCC Max Price Limit",
+        name="Max Price Limit",
         icon="mdi:cash-remove",
         native_min_value=-10.0,
         native_max_value=10.0,
@@ -27,12 +27,84 @@ NUMBERS: tuple[NumberEntityDescription, ...] = (
     ),
     NumberEntityDescription(
         key="low_price_charging_limit",
-        name="SmartEVCC Low Price Limit",
+        name="Low Price Limit",
         icon="mdi:cash-plus",
         native_min_value=-10.0,
         native_max_value=10.0,
         native_step=0.01,
         native_unit_of_measurement="SEK/kWh",
+    ),
+    NumberEntityDescription(
+        key="main_fuse",
+        name="Main Fuse",
+        icon="mdi:fuse",
+        native_min_value=10.0,
+        native_max_value=63.0,
+        native_step=1.0,
+        native_unit_of_measurement="A",
+    ),
+    NumberEntityDescription(
+        key="ev_min_soc",
+        name="EV Min SoC",
+        icon="mdi:battery-alert",
+        native_min_value=0.0,
+        native_max_value=100.0,
+        native_step=1.0,
+        native_unit_of_measurement="%",
+    ),
+    NumberEntityDescription(
+        key="ev_target_level",
+        name="EV Target Level",
+        icon="mdi:battery-charging-100",
+        native_min_value=0.0,
+        native_max_value=100.0,
+        native_step=1.0,
+        native_unit_of_measurement="%",
+    ),
+    NumberEntityDescription(
+        key="ev_battery_capacity",
+        name="EV Battery Capacity",
+        icon="mdi:car-battery",
+        native_min_value=10.0,
+        native_max_value=200.0,
+        native_step=1.0,
+        native_unit_of_measurement="kWh",
+    ),
+    NumberEntityDescription(
+        key="ev_max_charge_rate",
+        name="EV Max Charge Rate",
+        icon="mdi:ev-station",
+        native_min_value=1.0,
+        native_max_value=22.0,
+        native_step=0.1,
+        native_unit_of_measurement="kW",
+    ),
+    NumberEntityDescription(
+        key="ev_cold_temp_threshold",
+        name="Cold Temp Threshold",
+        icon="mdi:thermometer-minus",
+        native_min_value=-30.0,
+        native_max_value=20.0,
+        native_step=1.0,
+        native_unit_of_measurement="°C",
+    ),
+    NumberEntityDescription(
+        key="ev_cold_charge_rate",
+        name="Cold Charge Rate",
+        icon="mdi:snowflake",
+        native_min_value=1.0,
+        native_max_value=22.0,
+        native_step=0.1,
+        native_unit_of_measurement="kW",
+    ),
+    NumberEntityDescription(
+        key="recovery_duration",
+        name="Recovery Duration",
+        icon="mdi:timer-sand",
+        native_min_value=10.0,
+        native_max_value=600.0,
+        native_step=10.0,
+        native_unit_of_measurement="s",
     ),
 )
 
@@ -70,9 +142,17 @@ class SmartEVCCNumber(RestoreEntity, NumberEntity):
         """Restore state and subscribe to data updates."""
         await super().async_added_to_hass()
         
-        # Restore previous state
+        # Restore previous state or fetch from config
         last_state = await self.async_get_last_state()
-        if last_state is not None and last_state.state not in ("unknown", "unavailable"):
+        if last_state is None or (last_state and last_state.state in ("unknown", "unavailable")):
+            opt = self.ems.config_entry.options.get(self.entity_description.key)
+            if opt is not None:
+                self._attr_native_value = float(opt)
+            else:
+                dat = self.ems.config_entry.data.get(self.entity_description.key)
+                if dat is not None:
+                    self._attr_native_value = float(dat)
+        elif last_state is not None and last_state.state not in ("unknown", "unavailable"):
             try:
                 self._attr_native_value = float(last_state.state)
             except ValueError:

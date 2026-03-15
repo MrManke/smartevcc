@@ -34,6 +34,7 @@ from .const import (
     CONF_EV_COLD_TEMP_THRESHOLD,
     CONF_EV_COLD_CHARGE_RATE,
     CONF_DEPARTURE_TIME,
+    CONF_RECOVERY_DURATION,
     DEFAULT_DEBUG_MODE,
     DEFAULT_ENABLE_LOAD_SHEDDING,
     DEFAULT_MAIN_FUSE,
@@ -44,6 +45,7 @@ from .const import (
     DEFAULT_EV_COLD_TEMP_THRESHOLD,
     DEFAULT_EV_COLD_CHARGE_RATE,
     DEFAULT_DEPARTURE_TIME,
+    DEFAULT_RECOVERY_DURATION,
 )
 
 import math
@@ -55,7 +57,6 @@ SLOW_LOOP_INTERVAL = 3600  # seconds (1 hour)
 OVERLOAD_DURATION_MINOR = 60  # seconds before action on minor overload
 OVERLOAD_DURATION_SEVERE = 10  # seconds before action on severe overload
 SEVERE_OVERLOAD_MARGIN = 1.5  # Amps above safe_limit
-RECOVERY_DURATION = 180  # 3 minutes continuous below safe limit
 RECOVERY_MARGIN = 1.0  # Amps below safe limit
 ZAPTEC_MIN_AMPS = 6.0
 CLIMATE_ADJUST_TEMP = 3.0
@@ -91,6 +92,18 @@ class SmartEVCCEMS:
         self.force_charge: bool = False
         self.max_price_limit: float = 0.0
         self.low_price_charging_limit: float = 0.0
+        
+        # New Dynamic UI Entities (Loaded from Config once on boot, then managed by UI)
+        self.main_fuse: float = float(config_entry.options.get(CONF_MAIN_FUSE, config_entry.data.get(CONF_MAIN_FUSE, DEFAULT_MAIN_FUSE)))
+        self.enable_load_shedding: bool = bool(config_entry.options.get(CONF_ENABLE_LOAD_SHEDDING, config_entry.data.get(CONF_ENABLE_LOAD_SHEDDING, DEFAULT_ENABLE_LOAD_SHEDDING)))
+        self.ev_min_soc: float = float(config_entry.options.get(CONF_EV_MIN_SOC, config_entry.data.get(CONF_EV_MIN_SOC, DEFAULT_EV_MIN_SOC)))
+        self.ev_target_level: float = float(config_entry.options.get(CONF_EV_TARGET_LEVEL, config_entry.data.get(CONF_EV_TARGET_LEVEL, DEFAULT_EV_TARGET_LEVEL)))
+        self.ev_battery_capacity: float = float(config_entry.options.get(CONF_EV_BATTERY_CAPACITY, config_entry.data.get(CONF_EV_BATTERY_CAPACITY, DEFAULT_EV_BATTERY_CAPACITY)))
+        self.ev_max_charge_rate: float = float(config_entry.options.get(CONF_EV_MAX_CHARGE_RATE, config_entry.data.get(CONF_EV_MAX_CHARGE_RATE, DEFAULT_EV_MAX_CHARGE_RATE)))
+        self.ev_cold_temp_threshold: float = float(config_entry.options.get(CONF_EV_COLD_TEMP_THRESHOLD, config_entry.data.get(CONF_EV_COLD_TEMP_THRESHOLD, DEFAULT_EV_COLD_TEMP_THRESHOLD)))
+        self.ev_cold_charge_rate: float = float(config_entry.options.get(CONF_EV_COLD_CHARGE_RATE, config_entry.data.get(CONF_EV_COLD_CHARGE_RATE, DEFAULT_EV_COLD_CHARGE_RATE)))
+        self.recovery_duration: float = float(config_entry.options.get(CONF_RECOVERY_DURATION, config_entry.data.get(CONF_RECOVERY_DURATION, DEFAULT_RECOVERY_DURATION)))
+        self.debug_mode: bool = bool(config_entry.options.get(CONF_DEBUG_MODE, config_entry.data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE)))
 
     def _set_state(self, new_state: str) -> None:
         """Update the component state and notify listeners."""
@@ -108,18 +121,6 @@ class SmartEVCCEMS:
     def get_slow_loop_run(self) -> str:
         """Return the last slow loop text."""
         return self._slow_loop_last_run
-
-    @property
-    def debug_mode(self) -> bool:
-        """Return if debug mode is enabled."""
-        return self.config_entry.options.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE)
-
-    @property
-    def enable_load_shedding(self) -> bool:
-        """Return if load shedding is enabled."""
-        return self.config_entry.options.get(
-            CONF_ENABLE_LOAD_SHEDDING, DEFAULT_ENABLE_LOAD_SHEDDING
-        )
 
     @property
     def shedding_level_1_switches(self) -> list[str]:
@@ -144,11 +145,6 @@ class SmartEVCCEMS:
         if opt is not None:
              return opt
         return self.config_entry.data.get(CONF_SHEDDING_CLIMATES, [])
-
-    @property
-    def main_fuse(self) -> float:
-        """Return the configured main fuse limit."""
-        return float(self.config_entry.data.get(CONF_MAIN_FUSE, DEFAULT_MAIN_FUSE))
 
     @property
     def zaptec_charger(self) -> str | None:
@@ -315,8 +311,8 @@ class SmartEVCCEMS:
                 "switch", "turn_off", {"entity_id": zaptec_switch}, blocking=False
             )
 
-    async def _restore_previous_load(self) -> None:
-        """Restore previously shed loads or increase Zaptec."""
+    async def _restore_previous_load(self, headroom: float = 1.0) -> None:
+        """Restore previously shed loads or increase Zaptec mathematically."""
         if self._shedded_devices:
             # Restore the last shedded device (LIFO)
             device = self._shedded_devices.pop()
@@ -341,17 +337,22 @@ class SmartEVCCEMS:
                     )
             return
 
-        # If no loads to restore, try to increase Zaptec
+        # If no loads to restore, try to increase Zaptec via EVCC math
         zaptec_amps = self._get_zaptec_amps()
         if zaptec_amps is not None and zaptec_amps < self.main_fuse:
-            # Increase by 1A, up to the fuse limit
-            new_amps = min(self.main_fuse, zaptec_amps + 1.0)
-            _LOGGER.debug(
-                "Recovery: Increasing Zaptec charging from %sA to %sA",
-                zaptec_amps,
-                new_amps,
-            )
-            await self._set_zaptec_amps(new_amps)
+            # EVCC style jump: Add exact headroom, capped by max fuse and configured max charge rate
+            upper_limit = min(float(self.main_fuse), float(self.ev_max_charge_rate))
+            new_amps = min(upper_limit, float(zaptec_amps + headroom))
+            new_amps = round(new_amps, 1)  # Clean 1 decimal rounding
+
+            if new_amps > zaptec_amps:
+                _LOGGER.debug(
+                    "Recovery: Increasing Zaptec from %sA to %sA (Headroom: +%.1fA)",
+                    zaptec_amps,
+                    new_amps,
+                    headroom,
+                )
+                await self._set_zaptec_amps(new_amps)
 
     async def _trigger_overload_action(self, max_current: float) -> None:
         """Action taken when prolonged overload is detected."""
@@ -389,12 +390,12 @@ class SmartEVCCEMS:
         soc_id = cfg.options.get(CONF_EV_BATTERY_LEVEL) or cfg.data.get(CONF_EV_BATTERY_LEVEL)
         temp_id = cfg.options.get(CONF_EV_TEMP_SENSOR) or cfg.data.get(CONF_EV_TEMP_SENSOR)
         
-        min_soc = float(cfg.options.get(CONF_EV_MIN_SOC, cfg.data.get(CONF_EV_MIN_SOC, DEFAULT_EV_MIN_SOC)))
-        target_soc = float(cfg.options.get(CONF_EV_TARGET_LEVEL, cfg.data.get(CONF_EV_TARGET_LEVEL, DEFAULT_EV_TARGET_LEVEL)))
-        capacity = float(cfg.options.get(CONF_EV_BATTERY_CAPACITY, cfg.data.get(CONF_EV_BATTERY_CAPACITY, DEFAULT_EV_BATTERY_CAPACITY)))
-        max_rate = float(cfg.options.get(CONF_EV_MAX_CHARGE_RATE, cfg.data.get(CONF_EV_MAX_CHARGE_RATE, DEFAULT_EV_MAX_CHARGE_RATE)))
-        cold_threshold = float(cfg.options.get(CONF_EV_COLD_TEMP_THRESHOLD, cfg.data.get(CONF_EV_COLD_TEMP_THRESHOLD, DEFAULT_EV_COLD_TEMP_THRESHOLD)))
-        cold_rate = float(cfg.options.get(CONF_EV_COLD_CHARGE_RATE, cfg.data.get(CONF_EV_COLD_CHARGE_RATE, DEFAULT_EV_COLD_CHARGE_RATE)))
+        min_soc = self.ev_min_soc
+        target_soc = self.ev_target_level
+        capacity = self.ev_battery_capacity
+        max_rate = self.ev_max_charge_rate
+        cold_threshold = self.ev_cold_temp_threshold
+        cold_rate = self.ev_cold_charge_rate
         departure_time_str = cfg.options.get(CONF_DEPARTURE_TIME, cfg.data.get(CONF_DEPARTURE_TIME, DEFAULT_DEPARTURE_TIME))
 
         if not nordpool_id or not soc_id:
@@ -533,8 +534,16 @@ class SmartEVCCEMS:
         l3_id = data.get(CONF_P1_PHASE_3)
 
         l1_amps = self._get_float_state(l1_id)
+        if l1_amps is not None and l1_amps > 100:
+            l1_amps = l1_amps / 230.0
+
         l2_amps = self._get_float_state(l2_id)
+        if l2_amps is not None and l2_amps > 100:
+            l2_amps = l2_amps / 230.0
+
         l3_amps = self._get_float_state(l3_id)
+        if l3_amps is not None and l3_amps > 100:
+            l3_amps = l3_amps / 230.0
 
         fuse_limit = self.main_fuse
         safe_limit = fuse_limit - 0.5  # e.g. 15.5A for 16A fuse
@@ -640,14 +649,15 @@ class SmartEVCCEMS:
                 self._severe_overload_start_time = None
                 self._overload_start_time = None
 
-                if max_current < (safe_limit - RECOVERY_MARGIN):
-                    decision = f"Recovery Range ({max_current}A)"
+                headroom = safe_limit - max_current
+                if headroom >= 1.0:
+                    decision = f"Recovery Range (+{headroom:.1f}A available)"
                     safe_start = self._safe_start_time
                     if safe_start is None:
                         self._safe_start_time = now_ts
                         safe_start = now_ts
 
-                    if now_ts - safe_start >= RECOVERY_DURATION:
+                    if now_ts - safe_start >= self.recovery_duration:
                         decision += " -> ACTION TAKEN"
                         
                         zaptec_turned_on = False
@@ -666,11 +676,11 @@ class SmartEVCCEMS:
                                 )
                         
                         if not zaptec_turned_on:
-                            await self._restore_previous_load()
+                            await self._restore_previous_load(headroom)
                             
                         self._safe_start_time = now_ts  # Reset
                 else:
-                    # In hysteresis deadband (safe_limit - 1.5 <= max_current <= safe_limit)
+                    # In hysteresis deadband (safe_limit - 1.0 <= max_current <= safe_limit)
                     decision = f"Deadband ({max_current}A)"
         if self._price_allows_charging:
             # We are currently allowed to charge, update State Machine based on Fast Loop activity
@@ -696,7 +706,7 @@ class SmartEVCCEMS:
         self, loads: dict[str, float | None], safe_limit: float, decision: str
     ) -> None:
         """Dump debug data to JSON file."""
-        export_dir = self.hass.config.path("export")
+        export_dir = self.hass.config.path("custom_components", DOMAIN, "debug_logs")
         os.makedirs(export_dir, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

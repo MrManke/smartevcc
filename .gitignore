@@ -4,6 +4,7 @@ __pycache__/
 
 # Debug and export files
 export/
+debug_logs/
 *.json
 !manifest.json
 !hacs.json

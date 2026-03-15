@@ -26,14 +26,23 @@ Integrationen drar tung inspiration från de populära projekten [**evcc.io**](h
 
 ## Interactive UI Control
 
-När komponenten ligger i drift skapar den tre stycken reglage som du sätter i ditt grafiska Lovelace-gränssnitt för att styra beteendet "på the fly" utan att öppna konfiguratorn:
+När komponenten ligger i drift är alla dina viktiga parameterar samlade som fysiska reglage (Numbers) och Brytare (Switches) på din "SmartEVCC Controller" i ditt enhetskort i Home Assistant. Du slipper gå in i tilläggsmenyer – all interaktion görs "on the fly":
 
-* **[Number] Smartevcc Max Price Limit**
-  Styr en absolut smärtgräns i kronor. Skjuter priset över denna gräns laddas inte bilen oavsett hur tom den är. 
-* **[Number] Smartevcc Low Price Charging Limit**
-  Om timpriset dippar under detta värde kastas alla "scheman" och "hink-kalkyler" i papperskorgen – ladda för fullt, strömmen är så billig att det inte spelar någon roll.
-* **[Switch] Smartevcc Force Charge**
-  Override-knappen. Tryck in denna för att tvinga bilen att ladda nu. *Notera att systemet givetvis fortfarande är skyddat av Fast Loop och P1-mätaren även när du vrider på denna.*
+### Reglage (Number)
+* **Max Price Limit & Low Price Limit:** Ställ in extrema prisgränser för när bilen *aldrig* eller *alltid* ska ladda.
+* **Main Fuse (A):** Din konfigurerade huvudsäkring.
+* **Recovery Duration (s):** Hur länge systemet måste ha legat "på den säkra sidan" innan Zaptecs Ampere höjs igen.
+* **EV Min SoC & Target Level:** Styr din nödladdning och din målnivå (%).
+* **EV Battery Capacity & Max Charge Rate:** De fysiska parametrarna systemet använder för schemaläggning.
+* **Cold Temp Threshold & Cold Charge Rate:** Automatisk throttlings-logik på vinterhalvåret. 
+
+### Brytare (Switch)
+* **Force Charge (Override):** Tvingar laddning att starta omedelbart (men du är fortfarande skyddad av Fast Loop och P1-mätaren).
+* **Load Shedding:** Slå av/på funktionen för att tillfälligt stänga av husets element och varmvatten vid lasttoppar.
+* **Debug Mode:** Skapar detaljerade JSON-dumpar i mappen `/config/custom_components/smartevcc/debug_logs/` vid alla ingripanden från Fast Loop, så du kan se i detalj varför systemet reagerade.
+
+## EVCC-Matematik för Återhämtning
+När tunga storförbrukare i huset (ex. ugnen) stängs av räknar systemet direkt fram exakt hur stort utrymme ("headroom") som finns kvar upp till huvudsäkringen, och tilldelar laddboxen all tillgänglig kapacitet i ett enda responsivt kommando! En omedelbar maximering av den ström som faktiskt  är ledig.
 
 ## Installation & Konfiguration
 Inga yaml-filer behövs - komponenten stöder fullständig Home Assistant Config Flow.
