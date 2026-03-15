@@ -1,0 +1,70 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure SmartEVCC",
+        "description": "Enter the settings for your smart EV charging system.",
+        "data": {
+          "main_fuse": "Main Fuse (Amps)",
+          "p1_phase_1": "P1 Meter - Phase 1 Current",
+          "p1_phase_2": "P1 Meter - Phase 2 Current",
+          "p1_phase_3": "P1 Meter - Phase 3 Current",
+          "charger_control_entity": "Zaptec Max Amps (Number Entity)",
+          "nordpool_entity": "Nordpool Price Sensor (kWh)",
+          "ev_battery_level": "EV Battery Level (Sensor %)",
+          "ev_min_soc": "Emergency Charge: Min SoC (%)",
+          "ev_target_level": "Target Battery Level (%)",
+          "ev_battery_capacity": "Battery Capacity (kWh)",
+          "ev_max_charge_rate": "Max Charge Rate (kW)",
+          "ev_temp_sensor": "Temperature / Weather for Cold Throttling",
+          "ev_cold_temp_threshold": "Cold Threshold for Lower Charge Rate (°C)",
+          "ev_cold_charge_rate": "Assumed Charge Rate at Extreme Cold (kW)",
+          "departure_time": "Departure Time (HH:MM)",
+          "enable_load_shedding": "Enable Load Shedding (Relay Control)",
+          "shedding_level_1_switches": "Level 1 Switches (Water Heaters etc)",
+          "shedding_level_2_switches": "Level 2 Switches (Heavy Heaters etc)",
+          "shedding_climates": "Level 3: Climates (Decreased by 3 degrees)",
+          "debug_mode": "Enable extended debugging (JSON logging)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Change settings for SmartEVCC",
+        "description": "Adjust thresholds and relays for your smart EV charging.",
+        "data": {
+          "main_fuse": "Main Fuse (Amps)",
+          "p1_phase_1": "P1 Meter - Phase 1 Current",
+          "p1_phase_2": "P1 Meter - Phase 2 Current",
+          "p1_phase_3": "P1 Meter - Phase 3 Current",
+          "charger_control_entity": "Zaptec Max Amps (Number Entity)",
+          "nordpool_entity": "Nordpool Price Sensor (kWh)",
+          "ev_battery_level": "EV Battery Level (Sensor %)",
+          "ev_min_soc": "Emergency Charge: Min SoC (%)",
+          "ev_target_level": "Target Battery Level (%)",
+          "ev_battery_capacity": "Battery Capacity (kWh)",
+          "ev_max_charge_rate": "Max Charge Rate (kW)",
+          "ev_temp_sensor": "Temperature / Weather for Cold Throttling",
+          "ev_cold_temp_threshold": "Cold Threshold for Lower Charge Rate (°C)",
+          "ev_cold_charge_rate": "Assumed Charge Rate at Extreme Cold (kW)",
+          "departure_time": "Departure Time (HH:MM)",
+          "enable_load_shedding": "Enable Load Shedding",
+          "shedding_level_1_switches": "Level 1 Switches (Water Heaters etc)",
+          "shedding_level_2_switches": "Level 2 Switches (Heavy Heaters etc)",
+          "shedding_climates": "Level 3: Climates (Decreased)",
+          "debug_mode": "Enable extended debugging"
+        }
+      }
+    }
+  }
+}

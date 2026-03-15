@@ -1,0 +1,70 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfigurera SmartEVCC",
+        "description": "Fyll i inställningarna för din smarta laddningsstyrning.",
+        "data": {
+          "main_fuse": "Huvudsäkring (Ampere)",
+          "p1_phase_1": "P1 Mätare - Fas 1 ström",
+          "p1_phase_2": "P1 Mätare - Fas 2 ström",
+          "p1_phase_3": "P1 Mätare - Fas 3 ström",
+          "charger_control_entity": "Zaptec Maxström (Number Entity)",
+          "nordpool_entity": "Nordpool Pris-sensor (kWh)",
+          "ev_battery_level": "Bilens Batterinivå (Sensor %)",
+          "ev_min_soc": "Nödladdning: Min SoC (%)",
+          "ev_target_level": "Målnivå för Batteri (%)",
+          "ev_battery_capacity": "Batterikapacitet (kWh)",
+          "ev_max_charge_rate": "Maximal Laddeffekt (kW)",
+          "ev_temp_sensor": "Temperatur / Väder för Köldkompensering",
+          "ev_cold_temp_threshold": "Köldgräns för lägre laddeffekt (°C)",
+          "ev_cold_charge_rate": "Assumerad Laddeffekt vid extremkyla (kW)",
+          "departure_time": "Avfärdstid (HH:MM)",
+          "enable_load_shedding": "Aktivera Load Shedding (Relästyrning)",
+          "shedding_level_1_switches": "Nivå 1 Switchar (VVB etc)",
+          "shedding_level_2_switches": "Nivå 2 Switchar (Element etc)",
+          "shedding_climates": "Nivå 3: Klimatanläggningar (Sänks med 3 grader)",
+          "debug_mode": "Aktivera utökad felsökning (JSON-loggning)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kunde inte ansluta",
+      "invalid_auth": "Ogiltig autentisering",
+      "unknown": "Okänt fel inträffade"
+    },
+    "abort": {
+      "already_configured": "Enheten är redan konfigurerad"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ändra inställningar för SmartEVCC",
+        "description": "Ändra gränsvärden och reläer för din smarta elbilsladdning.",
+        "data": {
+          "main_fuse": "Huvudsäkring (Ampere)",
+          "p1_phase_1": "P1 Mätare - Fas 1 ström",
+          "p1_phase_2": "P1 Mätare - Fas 2 ström",
+          "p1_phase_3": "P1 Mätare - Fas 3 ström",
+          "charger_control_entity": "Zaptec Maxström (Number Entity)",
+          "nordpool_entity": "Nordpool Pris-sensor (kWh)",
+          "ev_battery_level": "Bilens Batterinivå (Sensor %)",
+          "ev_min_soc": "Nödladdning: Min SoC (%)",
+          "ev_target_level": "Målnivå för Batteri (%)",
+          "ev_battery_capacity": "Batterikapacitet (kWh)",
+          "ev_max_charge_rate": "Maximal Laddeffekt (kW)",
+          "ev_temp_sensor": "Temperatur / Väder för Köldkompensering",
+          "ev_cold_temp_threshold": "Köldgräns för lägre laddeffekt (°C)",
+          "ev_cold_charge_rate": "Assumerad Laddeffekt vid extremkyla (kW)",
+          "departure_time": "Avfärdstid (HH:MM)",
+          "enable_load_shedding": "Aktivera Load Shedding",
+          "shedding_level_1_switches": "Nivå 1 Switchar (VVB etc)",
+          "shedding_level_2_switches": "Nivå 2 Switchar (Element etc)",
+          "shedding_climates": "Nivå 3: Klimatanläggningar (Sänks)",
+          "debug_mode": "Aktivera utökad felsökning"
+        }
+      }
+    }
+  }
+}
