@@ -51,6 +51,7 @@ from .const import (
     CONF_SHEDDING_LEVEL_1_SWITCHES,
     CONF_SHEDDING_LEVEL_2_SWITCHES,
     CONF_CHARGER_STATUS_ENTITY,
+    CONF_ZAPTEC_PHASE_ENTITY,
     DEFAULT_DEBUG_MODE,
     DEFAULT_DEPARTURE_TIME,
     DEFAULT_ENABLE_LOAD_SHEDDING,
@@ -92,6 +93,10 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_CHARGER_CONTROL_ENTITY,
                 default=data.get(CONF_CHARGER_CONTROL_ENTITY, vol.UNDEFINED),
             ): EntitySelector(EntitySelectorConfig(domain="number")),
+            vol.Optional(
+                CONF_ZAPTEC_PHASE_ENTITY,
+                default=data.get(CONF_ZAPTEC_PHASE_ENTITY, vol.UNDEFINED),
+            ): EntitySelector(EntitySelectorConfig(domain="select")),
             
             # Phase 4: Nordpool & EV Planner Configs
             vol.Required(
@@ -171,6 +176,10 @@ def _get_options_schema(data: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_CHARGER_CONTROL_ENTITY,
                 default=data.get(CONF_CHARGER_CONTROL_ENTITY, vol.UNDEFINED),
             ): EntitySelector(EntitySelectorConfig(domain="number")),
+            vol.Optional(
+                CONF_ZAPTEC_PHASE_ENTITY,
+                default=data.get(CONF_ZAPTEC_PHASE_ENTITY, vol.UNDEFINED),
+            ): EntitySelector(EntitySelectorConfig(domain="select")),
             
             # Phase 4: Nordpool & EV Planner Configs
             vol.Required(

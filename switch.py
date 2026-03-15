@@ -34,6 +34,18 @@ DEBUG_MODE_SWITCH = SwitchEntityDescription(
     icon="mdi:bug",
 )
 
+SPIKE_OVERRIDE_SWITCH = SwitchEntityDescription(
+    key="spike_override",
+    name="Prisspik-Override (100%)",
+    icon="mdi:lightning-bolt-circle",
+)
+
+PHASE_BALANCING_SWITCH = SwitchEntityDescription(
+    key="phase_balancing",
+    name="1-fas Fallback",
+    icon="mdi:current-ac",
+)
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -46,6 +58,8 @@ async def async_setup_entry(
         SmartEVCCSwitch(ems, FORCE_CHARGE_SWITCH),
         SmartEVCCSwitch(ems, ENABLE_LOAD_SHEDDING_SWITCH),
         SmartEVCCSwitch(ems, DEBUG_MODE_SWITCH),
+        SmartEVCCSwitch(ems, SPIKE_OVERRIDE_SWITCH),
+        SmartEVCCSwitch(ems, PHASE_BALANCING_SWITCH),
     ]
     async_add_entities(entities)
 

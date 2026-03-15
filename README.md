@@ -24,6 +24,10 @@ Integrationen drar tung inspiration från de populära projekten [**evcc.io**](h
    * **Ingen kommunikation** med P1-mätare? Systemet ställer omedelbart ner laddboxen till max 6A som säkerhetsåtgärd.
    * **Dyr tjuvladdning stoppas:** Ligger bilen på faser där priset är högt blockerar komponenten minsta strömmen genom en ren *avstängning* (`switch.turn_off` på laddaren). Det förhindrar den där konstanta, dryga 4 kW-förlusten ("tjuvladdning") som annars kan ske.
 
+5. **Avancerade "Nice-To-Have" Funktioner [Nytt]**
+   * **Zaptec 1-fas Fallback:** Om en fas (L2/L3) oavsiktligt blir snedbelastad tvingar komponenten automatiskt Zaptec till att byta till "1-fas" istället för att stänga av helt. När strömmen blir tillgänglig igen byter den tillbaka till "3-fas".
+   * **"Sista Minuten" (Prisspik Override):** Om priset stiger extremt mycket inför *nästa* dag, prioriterar komponenten automatiskt att ladda till *100%* under den innevarande billiga natten för att säkra upp budgeten!
+
 ## Interactive UI Control
 
 När komponenten ligger i drift är alla dina viktiga parameterar samlade som fysiska reglage (Numbers) och Brytare (Switches) på din "SmartEVCC Controller" i ditt enhetskort i Home Assistant. Du slipper gå in i tilläggsmenyer – all interaktion görs "on the fly":
@@ -38,10 +42,13 @@ När komponenten ligger i drift är alla dina viktiga parameterar samlade som fy
 
 ### Sensorer
 * **[Ny] Lägsta prognostiserade temperatur:** Visar kalkylen från vädersensorn du angett, som systemet baserar "Cold Temp"-throttling på.
+* **[Ny] Planerad laddning:** En dynamisk text-sensor som exakt talar om vilka tider under dygnet SmartEVCC planerar att låta strömmen flöda till din EV. 
 
 ### Brytare (Switch)
 * **Force Charge (Override):** Tvingar laddning att starta omedelbart (men du är fortfarande skyddad av Fast Loop och P1-mätaren).
 * **Load Shedding:** Slå av/på funktionen för att tillfälligt stänga av husets element och varmvatten vid lasttoppar.
+* **Prisspik-Override (100%):** Om du vill låta systemet maxa till 100% (och strunta i ditt målvärde) om elen imorgon blir extremdyr ("Sista Minuten"-funktionen). 
+* **1-fas Fallback:** Aktivera den automatiska räddningen för snedbelastning. Tvingar Zaptec in i 1-fas tills headroom återvänder.
 * **Debug Mode:** Skapar detaljerade JSON-dumpar i mappen `/config/custom_components/smartevcc/debug_logs/` vid alla ingripanden från Fast Loop, så du kan se i detalj varför systemet reagerade.
 
 ## EVCC-Matematik för Återhämtning
@@ -61,7 +68,8 @@ Inga yaml-filer behövs - komponenten stöder fullständig Home Assistant Config
 | **Huvudsäkring** | Siffra på hur mycket ditt tak är per fas. Fritext: T.ex. 16, 20 eller 17.5A. | *`16`* |
 | **P1 Fas 1-3** | Sensorer som visar strömförbrukningen i realtid. | *`sensor.p1_fas_1_current`* |
 | **Zaptec Ladd-Amp** | The number-entity som ställer amp på boxen. | *`number.zaptec_id_max_laddstrom`* |
-| **[Ny] Charger Status** | Valfri sensor som visar om bilen är inkopplad för att stoppa onödiga anrop. | *`sensor.zaptec_id_laddstatus`* |
+| **Charger Status** | Valfri sensor som visar om bilen är inkopplad för att stoppa onödiga anrop. | *`sensor.zaptec_id_laddstatus`* |
+| **Zaptec Fas-läge** | Valfri sensor/select för att bestämma 1-fas eler 3-fasläge för fallback funktionen | *`select.zaptec_id_operating_mode`* |
 | **Nordpool Entity** | Nuvarande timpris-entitet från t.ex. HACS-Nordpool. | *`sensor.nordpool_kwh_se3`* |
 | **EV Battery Level** | Sensor som visar bilens nuvarande SoC (State of Charge). | *`sensor.id4_battery_level`* |
 | **EV Min SoC** | Nödladdning! %-gräns där bilen alltid laddar oavsett om elen är dyr. | *`20`* |

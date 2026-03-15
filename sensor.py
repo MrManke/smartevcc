@@ -35,6 +35,12 @@ LOWEST_TEMP_SENSOR = SensorEntityDescription(
     state_class=SensorStateClass.MEASUREMENT,
 )
 
+PLANNED_CHARGING_SENSOR = SensorEntityDescription(
+    key="planned_charging",
+    name="Planerad laddning",
+    icon="mdi:calendar-clock",
+)
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -45,6 +51,7 @@ async def async_setup_entry(
     async_add_entities([
         SmartEVCCStatusSensor(ems, STATUS_SENSOR),
         SmartEVCCWeatherForecastSensor(ems, LOWEST_TEMP_SENSOR),
+        SmartEVCCPlannedChargingSensor(ems, PLANNED_CHARGING_SENSOR),
     ])
 
 
@@ -116,6 +123,42 @@ class SmartEVCCWeatherForecastSensor(SensorEntity):
     def native_value(self) -> float | None:
         """Return the lowest expected temperature."""
         return self.ems.lowest_expected_temp
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when the entity is added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_update_{self.ems.config_entry.entry_id}",
+                self._handle_update,
+            )
+        )
+
+    @callback
+    def _handle_update(self) -> None:
+        """Handle updated data from the coordinator/EMS."""
+        self.async_write_ha_state()
+
+class SmartEVCCPlannedChargingSensor(SensorEntity):
+    """Representation of a SmartEVCC Planned Charging Sensor."""
+
+    def __init__(self, ems: SmartEVCCEMS, description: SensorEntityDescription) -> None:
+        """Initialize the sensor."""
+        self.ems = ems
+        self.entity_description = description
+        
+        self._attr_unique_id = f"{ems.config_entry.entry_id}_{description.key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, ems.config_entry.entry_id)},
+            name="SmartEVCC Controller",
+            manufacturer="SmartEVCC",
+            model="Local EMS",
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the planned charging text."""
+        return self.ems.planned_charging_text
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks when the entity is added to Home Assistant."""

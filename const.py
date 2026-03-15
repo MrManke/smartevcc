@@ -8,6 +8,7 @@ CONF_P1_PHASE_2 = "p1_phase_2"
 CONF_P1_PHASE_3 = "p1_phase_3"
 CONF_CHARGER_CONTROL_ENTITY = "charger_control_entity"
 CONF_CHARGER_STATUS_ENTITY = "charger_status_entity"
+CONF_ZAPTEC_PHASE_ENTITY = "zaptec_phase_entity"
 
 # Slow Loop Configs
 CONF_NORDPOOL_ENTITY = "nordpool_entity"
@@ -27,10 +28,14 @@ CONF_ENABLE_LOAD_SHEDDING = "enable_load_shedding"
 CONF_SHEDDING_LEVEL_1_SWITCHES = "shedding_level_1_switches"
 CONF_SHEDDING_LEVEL_2_SWITCHES = "shedding_level_2_switches"
 CONF_SHEDDING_CLIMATES = "shedding_climates"
+CONF_SPIKE_OVERRIDE = "spike_override"
+CONF_PHASE_BALANCING = "phase_balancing"
 
 DEFAULT_MAIN_FUSE = 16.0
 DEFAULT_DEBUG_MODE = False
 DEFAULT_ENABLE_LOAD_SHEDDING = False
+DEFAULT_SPIKE_OVERRIDE = False
+DEFAULT_PHASE_BALANCING = False
 
 # Slow Loop Defaults
 DEFAULT_EV_MIN_SOC = 20

@@ -11,6 +11,7 @@
           "p1_phase_3": "P1 Mätare - Fas 3 ström",
           "charger_control_entity": "Zaptec Maxström (Number Entity)",
           "charger_status_entity": "Sensor för laddstatus",
+          "zaptec_phase_entity": "Sensor/Select för Zaptec Fas-läge (1-fas/3-fas)",
           "nordpool_entity": "Nordpool Pris-sensor (kWh)",
           "ev_battery_level": "Bilens Batterinivå (Sensor %)",
           "ev_min_soc": "Nödladdning: Min SoC (%)",
@@ -51,6 +52,7 @@
           "p1_phase_3": "P1 Mätare - Fas 3 ström",
           "charger_control_entity": "Zaptec Maxström (Number Entity)",
           "charger_status_entity": "Sensor för laddstatus",
+          "zaptec_phase_entity": "Sensor/Select för Zaptec Fas-läge (1-fas/3-fas)",
           "nordpool_entity": "Nordpool Pris-sensor (kWh)",
           "ev_battery_level": "Bilens Batterinivå (Sensor %)",
           "ev_min_soc": "Nödladdning: Min SoC (%)",
@@ -75,6 +77,17 @@
     "sensor": {
       "lowest_temp_forecast": {
         "name": "Lägsta prognostiserade temperatur"
+      },
+      "planned_charging": {
+        "name": "Planerad laddning"
+      }
+    },
+    "switch": {
+      "spike_override": {
+        "name": "Prisspik-Override (100%)"
+      },
+      "phase_balancing": {
+        "name": "1-fas Fallback"
       }
     }
   }

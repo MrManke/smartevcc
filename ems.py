@@ -36,6 +36,7 @@ from .const import (
     CONF_DEPARTURE_TIME,
     CONF_RECOVERY_DURATION,
     CONF_CHARGER_STATUS_ENTITY,
+    CONF_ZAPTEC_PHASE_ENTITY,
     DEFAULT_DEBUG_MODE,
     DEFAULT_ENABLE_LOAD_SHEDDING,
     DEFAULT_MAIN_FUSE,
@@ -86,6 +87,7 @@ class SmartEVCCEMS:
         self._price_allows_charging: bool = False
         self._slow_loop_last_run: str = ""
         self.lowest_expected_temp: float | None = None
+        self.planned_charging_text: str | None = None
 
         # Sensor State Machine
         self.current_state: str = "Väntar"
@@ -94,6 +96,8 @@ class SmartEVCCEMS:
         self.force_charge: bool = False
         self.max_price_limit: float = 0.0
         self.low_price_charging_limit: float = 0.0
+        self.spike_override: bool = False
+        self.phase_balancing: bool = False
         
         # New Dynamic UI Entities (Loaded from Config once on boot, then managed by UI)
         self.main_fuse: float = float(config_entry.options.get(CONF_MAIN_FUSE, config_entry.data.get(CONF_MAIN_FUSE, DEFAULT_MAIN_FUSE)))
@@ -107,6 +111,7 @@ class SmartEVCCEMS:
         self.recovery_duration: float = float(config_entry.options.get(CONF_RECOVERY_DURATION, config_entry.data.get(CONF_RECOVERY_DURATION, DEFAULT_RECOVERY_DURATION)))
         self.debug_mode: bool = bool(config_entry.options.get(CONF_DEBUG_MODE, config_entry.data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE)))
         self.charger_status_entity: str | None = config_entry.options.get(CONF_CHARGER_STATUS_ENTITY) or config_entry.data.get(CONF_CHARGER_STATUS_ENTITY)
+        self.zaptec_phase_entity: str | None = config_entry.options.get(CONF_ZAPTEC_PHASE_ENTITY) or config_entry.data.get(CONF_ZAPTEC_PHASE_ENTITY)
 
     def _set_state(self, new_state: str) -> None:
         """Update the component state and notify listeners."""
@@ -346,7 +351,7 @@ class SmartEVCCEMS:
             # EVCC style jump: Add exact headroom, capped by max fuse and configured max charge rate
             upper_limit = min(float(self.main_fuse), float(self.ev_max_charge_rate))
             new_amps = min(upper_limit, float(zaptec_amps + headroom))
-            new_amps = round(new_amps, 1)  # Clean 1 decimal rounding
+            new_amps = float(round(new_amps, 1))  # Clean 1 decimal rounding
 
             if new_amps > zaptec_amps:
                 _LOGGER.debug(
@@ -494,11 +499,44 @@ class SmartEVCCEMS:
 
         if not all_future_prices:
             self._price_allows_charging = True
+            self.planned_charging_text = "Ingen laddning planerad (Priser saknas)"
             return
+
+        # SPIKE OVERRIDE CHECK
+        if self.spike_override and today_prices and tomorrow_prices:
+            today_avg = sum(today_prices) / len(today_prices)
+            tomorrow_max = max(tomorrow_prices)
+            spike_threshold = 1.50  # SEK difference threshold
+            
+            if (tomorrow_max - today_avg) >= spike_threshold:
+                _LOGGER.info("PRICE SPIKE DETECTED! Tomorrow max (%.2f) is %.2f higher than today avg (%.2f). Forcing 100%% Target.", tomorrow_max, (tomorrow_max - today_avg), today_avg)
+                energy_needed_kwh = (100.0 - current_soc) / 100.0 * capacity
+                if energy_needed_kwh > 0:
+                     hours_needed = math.ceil(energy_needed_kwh / assumed_rate)
+                     _LOGGER.debug("Recalculated Spike hours needed: %d", hours_needed)
 
         # Sort based on price to find cheapest N hours
         sorted_prices = sorted(all_future_prices, key=lambda x: x["price"])
         cheapest_hours = sorted_prices[:hours_needed]
+
+        # BUILD PLANNED CHARGING SENSOR TEXT
+        if not cheapest_hours:
+            self.planned_charging_text = "Målet nått. Ingen laddning."
+        else:
+            planned_sorted = sorted(cheapest_hours, key=lambda x: (x["day"], x["hour"]))
+            avg_price = sum(h["price"] for h in cheapest_hours) / len(cheapest_hours)
+            
+            blocks = []
+            for h in planned_sorted:
+                day_prefix = "Idag" if h["day"] == "today" else "Imorgon"
+                blocks.append(f"{day_prefix} {h['hour']:02d}:00")
+                
+            if len(blocks) > 3:
+                blocks_text = f"{blocks[0]} ... {blocks[-1]}"
+            else:
+                blocks_text = ", ".join(blocks)
+                
+            self.planned_charging_text = f"{blocks_text} (Snitt: {avg_price:.2f} kr)"
 
         # PRIORITY 1: Low Price Limit
         # Check if the current hour's price is below the low_price_charging_limit
@@ -647,6 +685,24 @@ class SmartEVCCEMS:
         max_current = max(valid_loads) if valid_loads else None
 
         if max_current is not None:
+            # PHASE BALANCING CHECK (Intercept Overload)
+            if self.phase_balancing and self.zaptec_phase_entity:
+                l1 = loads.get("L1")
+                if l1 is None:
+                    l1 = 0.0
+                    
+                if max_current > safe_limit and l1 <= safe_limit - 2.0:
+                    state = self.hass.states.get(self.zaptec_phase_entity)
+                    if state and str(state.state) != "1":
+                        _LOGGER.warning("Phase Imbalance (L1 safe, L2/L3 high). Downgrading Zaptec to 1-phase mode.")
+                        await self.hass.services.async_call("select", "select_option", {"entity_id": self.zaptec_phase_entity, "option": "1"}, blocking=False)
+                        decision = "Phase Balancing Triggered -> 1-phase mode"
+                        if self.debug_mode:
+                            await self.hass.async_add_executor_job(
+                                self._dump_debug_data, loads, safe_limit, decision
+                            )
+                        return
+
             if max_current > severe_limit:
                 # Severe overload
                 decision = f"Severe Overload ({max_current}A)"
@@ -712,7 +768,17 @@ class SmartEVCCEMS:
                                 )
                         
                         if not zaptec_turned_on:
-                            await self._restore_previous_load(headroom)
+                            # PHASE BALANCING RESTORE
+                            phase_restored = False
+                            if self.phase_balancing and self.zaptec_phase_entity and headroom >= 6.0:
+                                state = self.hass.states.get(self.zaptec_phase_entity)
+                                if state and str(state.state) == "1":
+                                    _LOGGER.info("Headroom restored! Upgrading Zaptec back to 3-phase mode.")
+                                    await self.hass.services.async_call("select", "select_option", {"entity_id": self.zaptec_phase_entity, "option": "3"}, blocking=False)
+                                    phase_restored = True
+                                    
+                            if not phase_restored:
+                                await self._restore_previous_load(headroom)
                             
                         self._safe_start_time = now_ts  # Reset
                 else:
