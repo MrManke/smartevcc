@@ -18,8 +18,17 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_CHARGER_CONTROL_ENTITY,
     CONF_DEBUG_MODE,
+    CONF_DEPARTURE_TIME,
     CONF_ENABLE_LOAD_SHEDDING,
+    CONF_EV_BATTERY_CAPACITY,
+    CONF_EV_BATTERY_LEVEL,
+    CONF_EV_COLD_CHARGE_RATE,
+    CONF_EV_COLD_TEMP_THRESHOLD,
+    CONF_EV_MAX_CHARGE_RATE,
+    CONF_EV_TARGET_LEVEL,
+    CONF_EV_TEMP_SENSOR,
     CONF_MAIN_FUSE,
+    CONF_NORDPOOL_ENTITY,
     CONF_P1_PHASE_1,
     CONF_P1_PHASE_2,
     CONF_P1_PHASE_3,
@@ -27,10 +36,17 @@ from .const import (
     CONF_SHEDDING_LEVEL_1_SWITCHES,
     CONF_SHEDDING_LEVEL_2_SWITCHES,
     DEFAULT_DEBUG_MODE,
+    DEFAULT_DEPARTURE_TIME,
     DEFAULT_ENABLE_LOAD_SHEDDING,
+    DEFAULT_EV_BATTERY_CAPACITY,
+    DEFAULT_EV_COLD_CHARGE_RATE,
+    DEFAULT_EV_COLD_TEMP_THRESHOLD,
+    DEFAULT_EV_MAX_CHARGE_RATE,
+    DEFAULT_EV_TARGET_LEVEL,
     DEFAULT_MAIN_FUSE,
     DOMAIN,
 )
+import homeassistant.helpers.selector as selector
 
 def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
     """Return the base schema with current or default values."""
@@ -59,6 +75,37 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_CHARGER_CONTROL_ENTITY,
                 default=data.get(CONF_CHARGER_CONTROL_ENTITY, vol.UNDEFINED),
             ): EntitySelector(EntitySelectorConfig(domain="number")),
+            
+            # Phase 4: Nordpool & EV Planner Configs
+            vol.Required(
+                CONF_NORDPOOL_ENTITY, default=data.get(CONF_NORDPOOL_ENTITY, vol.UNDEFINED)
+            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            vol.Required(
+                CONF_EV_BATTERY_LEVEL, default=data.get(CONF_EV_BATTERY_LEVEL, vol.UNDEFINED)
+            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            vol.Required(
+                CONF_EV_TARGET_LEVEL, default=data.get(CONF_EV_TARGET_LEVEL, DEFAULT_EV_TARGET_LEVEL)
+            ): NumberSelector(NumberSelectorConfig(min=10, max=100, step=1, mode=NumberSelectorMode.SLIDER)),
+            vol.Required(
+                CONF_EV_BATTERY_CAPACITY, default=data.get(CONF_EV_BATTERY_CAPACITY, DEFAULT_EV_BATTERY_CAPACITY)
+            ): NumberSelector(NumberSelectorConfig(min=10.0, max=150.0, step=1.0, mode=NumberSelectorMode.BOX)),
+            vol.Required(
+                CONF_EV_MAX_CHARGE_RATE, default=data.get(CONF_EV_MAX_CHARGE_RATE, DEFAULT_EV_MAX_CHARGE_RATE)
+            ): NumberSelector(NumberSelectorConfig(min=1.0, max=22.0, step=0.1, mode=NumberSelectorMode.BOX)),
+            vol.Required(
+                CONF_EV_TEMP_SENSOR, default=data.get(CONF_EV_TEMP_SENSOR, vol.UNDEFINED)
+            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            vol.Required(
+                CONF_EV_COLD_TEMP_THRESHOLD, default=data.get(CONF_EV_COLD_TEMP_THRESHOLD, DEFAULT_EV_COLD_TEMP_THRESHOLD)
+            ): NumberSelector(NumberSelectorConfig(min=-30.0, max=0.0, step=0.5, mode=NumberSelectorMode.BOX)),
+            vol.Required(
+                CONF_EV_COLD_CHARGE_RATE, default=data.get(CONF_EV_COLD_CHARGE_RATE, DEFAULT_EV_COLD_CHARGE_RATE)
+            ): NumberSelector(NumberSelectorConfig(min=1.0, max=22.0, step=0.1, mode=NumberSelectorMode.BOX)),
+            vol.Required(
+                CONF_DEPARTURE_TIME, default=data.get(CONF_DEPARTURE_TIME, DEFAULT_DEPARTURE_TIME)
+            ): selector.TimeSelector(),
+
+            # Shedding settings
             vol.Optional(
                 CONF_ENABLE_LOAD_SHEDDING,
                 default=data.get(

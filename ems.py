@@ -10,8 +10,10 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import (
+    DOMAIN,
     CONF_DEBUG_MODE,
     CONF_ENABLE_LOAD_SHEDDING,
     CONF_MAIN_FUSE,
@@ -22,14 +24,32 @@ from .const import (
     CONF_SHEDDING_LEVEL_1_SWITCHES,
     CONF_SHEDDING_LEVEL_2_SWITCHES,
     CONF_CHARGER_CONTROL_ENTITY,
+    CONF_NORDPOOL_ENTITY,
+    CONF_EV_BATTERY_LEVEL,
+    CONF_EV_TARGET_LEVEL,
+    CONF_EV_BATTERY_CAPACITY,
+    CONF_EV_MAX_CHARGE_RATE,
+    CONF_EV_TEMP_SENSOR,
+    CONF_EV_COLD_TEMP_THRESHOLD,
+    CONF_EV_COLD_CHARGE_RATE,
+    CONF_DEPARTURE_TIME,
     DEFAULT_DEBUG_MODE,
     DEFAULT_ENABLE_LOAD_SHEDDING,
     DEFAULT_MAIN_FUSE,
+    DEFAULT_EV_TARGET_LEVEL,
+    DEFAULT_EV_BATTERY_CAPACITY,
+    DEFAULT_EV_MAX_CHARGE_RATE,
+    DEFAULT_EV_COLD_TEMP_THRESHOLD,
+    DEFAULT_EV_COLD_CHARGE_RATE,
+    DEFAULT_DEPARTURE_TIME,
 )
+
+import math
 
 _LOGGER = logging.getLogger(__name__)
 
 FAST_LOOP_INTERVAL = 10  # seconds
+SLOW_LOOP_INTERVAL = 3600  # seconds (1 hour)
 OVERLOAD_DURATION_MINOR = 60  # seconds before action on minor overload
 OVERLOAD_DURATION_SEVERE = 10  # seconds before action on severe overload
 SEVERE_OVERLOAD_MARGIN = 1.5  # Amps above safe_limit
@@ -47,6 +67,7 @@ class SmartEVCCEMS:
         self.hass = hass
         self.config_entry = config_entry
         self._remove_fast_loop = None
+        self._remove_slow_loop = None
 
         # State tracking for filtering
         self._overload_start_time: float | None = None
@@ -56,6 +77,30 @@ class SmartEVCCEMS:
 
         # State tracking for load shedding recovery
         self._shedded_devices: list[dict[str, Any]] = []
+
+        # Slow Loop State
+        self._price_allows_charging: bool = False
+        self._slow_loop_last_run: str = ""
+
+        # Sensor State Machine
+        self.current_state: str = "Idle"
+
+    def _set_state(self, new_state: str) -> None:
+        """Update the component state and notify listeners."""
+        if self.current_state != new_state:
+            _LOGGER.info("State changed: %s -> %s", self.current_state, new_state)
+            self.current_state = new_state
+            async_dispatcher_send(
+                self.hass, f"{DOMAIN}_update_{self.config_entry.entry_id}"
+            )
+
+    def get_shedded_devices(self) -> list[dict[str, Any]]:
+        """Return the current list of shedded devices."""
+        return self._shedded_devices
+
+    def get_slow_loop_run(self) -> str:
+        """Return the last slow loop text."""
+        return self._slow_loop_last_run
 
     @property
     def debug_mode(self) -> bool:
@@ -114,6 +159,15 @@ class SmartEVCCEMS:
             self._fast_loop_tick,
             asyncio.timedelta(seconds=FAST_LOOP_INTERVAL),
         )
+        
+        _LOGGER.debug("Starting SmartEVCC EMS slow loop")
+        self._remove_slow_loop = async_track_time_interval(
+            self.hass,
+            self._slow_loop_tick,
+            asyncio.timedelta(seconds=SLOW_LOOP_INTERVAL),
+        )
+        # Run slow loop once immediately on startup
+        self.hass.async_create_task(self._slow_loop_tick(datetime.now()))
 
     async def async_stop(self) -> None:
         """Stop the EMS loops."""
@@ -121,6 +175,9 @@ class SmartEVCCEMS:
         if self._remove_fast_loop:
             self._remove_fast_loop()
             self._remove_fast_loop = None
+        if self._remove_slow_loop:
+            self._remove_slow_loop()
+            self._remove_slow_loop = None
 
     def _get_float_state(self, entity_id: str | None) -> float | None:
         """Helper to get and parse float state safely."""
@@ -315,6 +372,94 @@ class SmartEVCCEMS:
                 "Overload persisted but Load Shedding is disabled. Cannot reduce further."
             )
 
+    async def _slow_loop_tick(self, now: datetime) -> None:
+        """Execute the slow loop logic (Price & Capacity Planner)."""
+        _LOGGER.debug("Running SmartEVCC slow loop price planner")
+        
+        cfg = self.config_entry
+        nordpool_id = cfg.options.get(CONF_NORDPOOL_ENTITY) or cfg.data.get(CONF_NORDPOOL_ENTITY)
+        soc_id = cfg.options.get(CONF_EV_BATTERY_LEVEL) or cfg.data.get(CONF_EV_BATTERY_LEVEL)
+        temp_id = cfg.options.get(CONF_EV_TEMP_SENSOR) or cfg.data.get(CONF_EV_TEMP_SENSOR)
+        
+        target_soc = float(cfg.options.get(CONF_EV_TARGET_LEVEL, cfg.data.get(CONF_EV_TARGET_LEVEL, DEFAULT_EV_TARGET_LEVEL)))
+        capacity = float(cfg.options.get(CONF_EV_BATTERY_CAPACITY, cfg.data.get(CONF_EV_BATTERY_CAPACITY, DEFAULT_EV_BATTERY_CAPACITY)))
+        max_rate = float(cfg.options.get(CONF_EV_MAX_CHARGE_RATE, cfg.data.get(CONF_EV_MAX_CHARGE_RATE, DEFAULT_EV_MAX_CHARGE_RATE)))
+        cold_threshold = float(cfg.options.get(CONF_EV_COLD_TEMP_THRESHOLD, cfg.data.get(CONF_EV_COLD_TEMP_THRESHOLD, DEFAULT_EV_COLD_TEMP_THRESHOLD)))
+        cold_rate = float(cfg.options.get(CONF_EV_COLD_CHARGE_RATE, cfg.data.get(CONF_EV_COLD_CHARGE_RATE, DEFAULT_EV_COLD_CHARGE_RATE)))
+        departure_time_str = cfg.options.get(CONF_DEPARTURE_TIME, cfg.data.get(CONF_DEPARTURE_TIME, DEFAULT_DEPARTURE_TIME))
+
+        if not nordpool_id or not soc_id:
+            _LOGGER.warning("Slow Loop missing Nordpool or EV SOC entity. Allowing charging by default.")
+            self._price_allows_charging = True
+            return
+
+        current_soc = self._get_float_state(soc_id)
+        if current_soc is None:
+            _LOGGER.warning("Could not read EV SOC. Allowing charging by default.")
+            self._price_allows_charging = True
+            return
+
+        # 1. Calculate Energy Needed
+        energy_needed_kwh = (target_soc - current_soc) / 100.0 * capacity
+        if energy_needed_kwh <= 0:
+            _LOGGER.info("EV Target SOC reached (%.1f%% >= %.1f%%). Pausing charging.", current_soc, target_soc)
+            self._price_allows_charging = False
+            return
+
+        # 2. Climate Throttle Logic
+        assumed_rate = max_rate
+        if temp_id:
+            current_temp = self._get_float_state(temp_id)
+            if current_temp is not None and current_temp < cold_threshold:
+                _LOGGER.info("Cold weather detected (%.1f°C < %.1f°C). Throttling assumed charge rate to %.1fkW", current_temp, cold_threshold, cold_rate)
+                assumed_rate = cold_rate
+
+        hours_needed = math.ceil(energy_needed_kwh / assumed_rate)
+        _LOGGER.debug("Need %.1fkWh at assumed rate %.1fkW -> %d hours requested.", energy_needed_kwh, assumed_rate, hours_needed)
+
+        # 3. Price Optimization
+        nordpool_state = self.hass.states.get(nordpool_id)
+        if not nordpool_state or "today" not in nordpool_state.attributes:
+            _LOGGER.error("Nordpool state or attributes missing! Allowing charging by default.")
+            self._price_allows_charging = True
+            return
+
+        today_prices = nordpool_state.attributes.get("today", [])
+        tomorrow_prices = nordpool_state.attributes.get("tomorrow", []) or []
+
+        # Parse departure time
+        try:
+            dep_hour, dep_minute = map(int, departure_time_str.split(":"))
+        except ValueError:
+            dep_hour, dep_minute = 7, 0
+            _LOGGER.error("Invalid departure time format '%s', defaulting to 07:00", departure_time_str)
+
+        all_future_prices = []
+        current_hour = now.hour
+        
+        # Add remaining hours today
+        for i in range(current_hour, len(today_prices)):
+            all_future_prices.append({"hour": i, "price": today_prices[i], "day": "today"})
+            
+        # Add hours tomorrow up until departure
+        for i in range(min(len(tomorrow_prices), dep_hour + 1)): # Include departure hour
+            all_future_prices.append({"hour": i, "price": tomorrow_prices[i], "day": "tomorrow"})
+
+        if not all_future_prices:
+            self._price_allows_charging = True
+            return
+
+        # Sort based on price to find cheapest N hours
+        sorted_prices = sorted(all_future_prices, key=lambda x: x["price"])
+        cheapest_hours = sorted_prices[:hours_needed]
+
+        # Is the CURRENT hour in the cheapest list?
+        charge_now = any(h["hour"] == current_hour and h["day"] == "today" for h in cheapest_hours)
+        
+        self._price_allows_charging = charge_now
+        self._slow_loop_last_run = f"Needed {hours_needed}h. Charge now: {charge_now}."
+        _LOGGER.info(self._slow_loop_last_run)
+
     async def _fast_loop_tick(self, now: datetime) -> None:
         """Execute the fast loop logic (Fuse Protection)."""
         data = self.config_entry.data
@@ -334,14 +479,40 @@ class SmartEVCCEMS:
         loads = {"L1": l1_amps, "L2": l2_amps, "L3": l3_amps}
         
         now_ts = time.time()
+
+        # Determine what state we ALREADY are in right now visually
         decision = "OK"
 
+        # PHASE 4 INTEGRATION: If price/schedule planner blocks charging, override.
+        if not self._price_allows_charging:
+            _LOGGER.debug("Price Optimizer: Charging blocked. Pausing Zaptec/forcing to min.")
+            decision = "Price Planner: Paused"
+            self._set_state("Price_Wait")
+            
+            zaptec_amps = self._get_zaptec_amps()
+            if zaptec_amps is None or zaptec_amps > ZAPTEC_MIN_AMPS:
+                await self._set_zaptec_amps(ZAPTEC_MIN_AMPS)
+            
+            # If we're forcing 6A/paused, don't execute the rest of the limit recovery loop
+            # BUT we still need to process P1 missing logic first.
+            if None in loads.values():
+                 pass # Let the P1 logic below handle it natively
+            else:
+                 if self.debug_mode:
+                    await self.hass.async_add_executor_job(
+                        self._dump_debug_data, loads, safe_limit, decision
+                    )
+                 return
+
         if None in loads.values():
-            if not self._p1_missing_start_time:
+            p1_start = self._p1_missing_start_time
+            if p1_start is None:
                 self._p1_missing_start_time = now_ts
-            elif now_ts - self._p1_missing_start_time >= 30:
+            elif now_ts - p1_start >= 30:
                 _LOGGER.error("P1 meter data missing for >30s! Forcing Zaptec to minimum.")
                 decision = "P1 Data Missing (Fallback to 6A)"
+                self._set_state("Fuse_Protect_Paused")
+                
                 zaptec_amps = self._get_zaptec_amps()
                 if zaptec_amps is None or zaptec_amps > ZAPTEC_MIN_AMPS:
                     await self._set_zaptec_amps(ZAPTEC_MIN_AMPS)
@@ -360,12 +531,14 @@ class SmartEVCCEMS:
             if max_current > severe_limit:
                 # Severe overload
                 decision = f"Severe Overload ({max_current}A)"
-                if not self._severe_overload_start_time:
+                sev_start = self._severe_overload_start_time
+                if sev_start is None:
                     self._severe_overload_start_time = now_ts
+                    sev_start = now_ts
                 self._safe_start_time = None
 
                 if (
-                    now_ts - self._severe_overload_start_time
+                    now_ts - sev_start
                     >= OVERLOAD_DURATION_SEVERE
                 ):
                     decision += " -> ACTION TAKEN"
@@ -377,11 +550,13 @@ class SmartEVCCEMS:
                 # Minor overload
                 decision = f"Minor Overload ({max_current}A)"
                 self._severe_overload_start_time = None
-                if not self._overload_start_time:
+                ov_start = self._overload_start_time
+                if ov_start is None:
                     self._overload_start_time = now_ts
+                    ov_start = now_ts
                 self._safe_start_time = None
 
-                if now_ts - self._overload_start_time >= OVERLOAD_DURATION_MINOR:
+                if now_ts - ov_start >= OVERLOAD_DURATION_MINOR:
                     decision += " -> ACTION TAKEN"
                     await self._trigger_overload_action(max_current)
                     self._overload_start_time = now_ts  # Reset
@@ -393,17 +568,30 @@ class SmartEVCCEMS:
 
                 if max_current < (safe_limit - RECOVERY_MARGIN):
                     decision = f"Recovery Range ({max_current}A)"
-                    if not self._safe_start_time:
+                    safe_start = self._safe_start_time
+                    if safe_start is None:
                         self._safe_start_time = now_ts
+                        safe_start = now_ts
 
-                    if now_ts - self._safe_start_time >= RECOVERY_DURATION:
+                    if now_ts - safe_start >= RECOVERY_DURATION:
                         decision += " -> ACTION TAKEN"
                         await self._restore_previous_load()
                         self._safe_start_time = now_ts  # Reset
                 else:
                     # In hysteresis deadband (safe_limit - 1.5 <= max_current <= safe_limit)
                     decision = f"Deadband ({max_current}A)"
-                    self._safe_start_time = None
+        if self._price_allows_charging:
+            # We are currently allowed to charge, update State Machine based on Fast Loop activity
+            if self._shedded_devices:
+                self._set_state("Shedding")
+            else:
+                zaptec_amps = self._get_zaptec_amps()
+                if max_current is not None and max_current > safe_limit:
+                    self._set_state("Fuse_Protect_Paused")
+                elif zaptec_amps is not None and zaptec_amps > ZAPTEC_MIN_AMPS:
+                    self._set_state("Charging")
+                else:
+                    self._set_state("Idle")
 
         if self.debug_mode:
             # Run the file I/O safely in an executor to not block the async loop
@@ -427,6 +615,8 @@ class SmartEVCCEMS:
             "safe_limit": safe_limit,
             "phase_loads": loads,
             "decision": decision,
+            "price_allows_charging": self._price_allows_charging,
+            "slow_loop_last_run": self._slow_loop_last_run,
             "shedded_devices_count": len(self._shedded_devices),
             "shedded_devices": self._shedded_devices,
         }
