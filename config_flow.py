@@ -94,7 +94,7 @@ def _get_base_schema(data: dict[str, Any] | None = None) -> vol.Schema:
             ): NumberSelector(NumberSelectorConfig(min=1.0, max=22.0, step=0.1, mode=NumberSelectorMode.BOX)),
             vol.Required(
                 CONF_EV_TEMP_SENSOR, default=data.get(CONF_EV_TEMP_SENSOR, vol.UNDEFINED)
-            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+            ): EntitySelector(EntitySelectorConfig(domain=["sensor", "weather"])),
             vol.Required(
                 CONF_EV_COLD_TEMP_THRESHOLD, default=data.get(CONF_EV_COLD_TEMP_THRESHOLD, DEFAULT_EV_COLD_TEMP_THRESHOLD)
             ): NumberSelector(NumberSelectorConfig(min=-30.0, max=0.0, step=0.5, mode=NumberSelectorMode.BOX)),

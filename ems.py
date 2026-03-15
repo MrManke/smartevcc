@@ -415,9 +415,34 @@ class SmartEVCCEMS:
         # 2. Climate Throttle Logic
         assumed_rate = max_rate
         if temp_id:
-            current_temp = self._get_float_state(temp_id)
-            if current_temp is not None and current_temp < cold_threshold:
-                _LOGGER.info("Cold weather detected (%.1f°C < %.1f°C). Throttling assumed charge rate to %.1fkW", current_temp, cold_threshold, cold_rate)
+            min_expected_temp = None
+
+            if temp_id.startswith("weather."):
+                try:
+                    response = await self.hass.services.async_call(
+                        "weather",
+                        "get_forecasts",
+                        {"entity_id": temp_id, "type": "hourly"},
+                        blocking=True,
+                        return_response=True,
+                    )
+                    if isinstance(response, dict):
+                        forecasts = response.get(temp_id, {}).get("forecast", [])
+                        if forecasts:
+                            # Look at the next 24 hours (or less if fewer are available)
+                            temps = [f.get("temperature") for f in forecasts[:24] if f.get("temperature") is not None]
+                            if temps:
+                                min_expected_temp = min(temps)
+                                _LOGGER.debug("Weather forecast next 24h min temp: %.1f", min_expected_temp)
+                except Exception as e:
+                    _LOGGER.error("Failed to fetch weather forecast for %s: %s", temp_id, e)
+            
+            # Fallback for standard sensors or if forecast fails
+            if min_expected_temp is None:
+                min_expected_temp = self._get_float_state(temp_id)
+
+            if min_expected_temp is not None and min_expected_temp < cold_threshold:
+                _LOGGER.info("Cold weather expected (%.1f°C < %.1f°C). Throttling assumed charge rate to %.1fkW", min_expected_temp, cold_threshold, cold_rate)
                 assumed_rate = cold_rate
 
         hours_needed = math.ceil(energy_needed_kwh / assumed_rate)
