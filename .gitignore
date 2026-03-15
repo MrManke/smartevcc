@@ -1,0 +1,12 @@
+# Home Assistant custom component caching
+__pycache__/
+*.pyc
+
+# Debug and export files
+export/
+*.json
+!manifest.json
+
+# OS generated files
+.DS_Store
+Thumbs.db

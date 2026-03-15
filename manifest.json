@@ -1,0 +1,10 @@
+{
+  "domain": "smartevcc",
+  "name": "SmartEVCC",
+  "version": "0.1.0",
+  "documentation": "https://github.com/TODO",
+  "dependencies": [],
+  "codeowners": [],
+  "requirements": [],
+  "iot_class": "local_polling"
+}
